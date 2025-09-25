@@ -1,4 +1,4 @@
-// server.js — Express web service to serve the SPA + expose env config
+// server.js — Express web service to serve SPA + expose env config
 try { require('dotenv').config(); } catch (_) {}
 
 const path = require('path');
