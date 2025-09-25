@@ -1,481 +1,328 @@
-/* ========= SPA Router ========= */
+/* ============================
+   main.js — Web Service client
+============================ */
+
+/* Helper: JSON API */
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    method: opts.method || 'GET',
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const j = await res.json(); msg = j.error || JSON.stringify(j); } catch {}
+    throw new Error(msg);
+  }
+  try { return await res.json(); } catch { return null; }
+}
+
+/* Router */
 function showSection(id) {
-  document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+  document.querySelectorAll('section').forEach(sec => sec.classList.add('hidden'));
   const el = document.getElementById(id);
   if (el) el.classList.remove('hidden');
-  // keep admin/staff panels visible state
-  showAuth(); showPanels();
 }
 
-/* ========= Users/session helpers (localStorage) ========= */
-function loadUsers(){ try{return JSON.parse(localStorage.getItem('users')||'[]')}catch{return[]} }
-function saveUsers(arr){ localStorage.setItem('users', JSON.stringify(arr)); }
-function isLoggedIn(){ return localStorage.getItem('staffSession')==='true'; }
-function role(){ return localStorage.getItem('staffRole')||'viewer'; }
+/* Login (server-first, demo fallback) */
+async function doLogin(e) {
+  if (e) e.preventDefault();
+  const username = (document.getElementById('username')?.value || '').trim();
+  const password = (document.getElementById('password')?.value || '').trim();
 
-/* Seed admin user once if none exist */
-(function seedAdmin(){
-  const existing = loadUsers();
-  if (!existing.some(u => u.role === 'admin')) {
-    existing.push({ username: "ThatLegendJack", password: "BooBear24/7", role: "admin" });
-    saveUsers(existing);
+  try {
+    await api('/api/auth/login', { method: 'POST', body: { username, password } });
+    alert(`Logged in as ${username}`);
+  } catch {
+    alert(`(Demo) Logged in as ${username}`);
   }
-})();
-
-/* ========= Auth UI ========= */
-function showAuth(){
-  const box=document.getElementById('authBox');
-  if(!box) return;
-  if(isLoggedIn()){
-    const name=localStorage.getItem('staffName')||'staff';
-    box.innerHTML=`<button onclick="logout()">Logout (${name})</button>`;
-  }else{
-    box.innerHTML=`<a href="#" onclick="showSection('login')">Login</a>`;
-  }
-}
-function showPanels(){
-  const staff = isLoggedIn();
-  const r = role();
-  const sp = document.getElementById('staffPanel');
-  const ap = document.getElementById('adminPanel');
-  if (sp) sp.style.display = staff ? 'block':'none';
-  if (ap) ap.style.display = (staff && r==='admin') ? 'block':'none';
-  if(staff){
-    const who = document.getElementById('who');
-    const badge = document.getElementById('roleBadge');
-    if (who) who.textContent = localStorage.getItem('staffName')||'staff';
-    if (badge) badge.textContent = r;
-    prefillInputs();
-    if(r==='admin') renderUsers();
-  }
+  showSection('home');
+  return false;
 }
 
-/* ========= Login page logic ========= */
-(function wireLogin(){
-  const btn = document.getElementById('go');
-  if (!btn) return;
-  btn.onclick = () => {
-    const u = document.getElementById('u').value.trim();
-    const p = document.getElementById('p').value.trim();
-    const msg = document.getElementById('msg');
-    const user = loadUsers().find(x => x.username===u && x.password===p);
-    if(user){
-      localStorage.setItem('staffSession','true');
-      localStorage.setItem('staffName',user.username);
-      localStorage.setItem('staffRole',user.role);
-      if (msg) msg.textContent="✅ Logged in.";
-      showAuth(); showPanels();
-      showSection('home');
-    }else{
-      if (msg) msg.textContent="❌ Invalid credentials";
-    }
-  };
-})();
+/* Twitch Embed */
+const TWITCH_CHANNEL = 'ThatLegendJackk';
+let twitchEmbed = null;
 
-function logout(){
-  localStorage.removeItem('staffSession');
-  localStorage.removeItem('staffName');
-  localStorage.removeItem('staffRole');
-  showAuth(); showPanels();
-}
+function initTwitch() {
+  const el = document.getElementById('twitch-player');
+  if (!el) return;
+  if (typeof Twitch === 'undefined' || !Twitch.Embed) { setTimeout(initTwitch, 250); return; }
+  if (twitchEmbed) return;
 
-/* ========= Admin user management ========= */
-function renderUsers(){
-  const list=document.getElementById('userList');
-  if (!list) return;
-  const users=loadUsers();
-  list.innerHTML='';
-  users.forEach((u,i)=>{
-    const row=document.createElement('div');
-    row.style.display='flex'; row.style.justifyContent='space-between'; row.style.margin='.3rem 0';
-    row.innerHTML=`<div>${u.username} <span class="badge">${u.role}</span></div>
-      <button onclick="removeUser(${i})" style="background:#444;color:#fff;border:none;border-radius:8px;padding:.35rem .6rem">Remove</button>`;
-    if(u.role==='admin') row.querySelector('button').disabled=true;
-    list.appendChild(row);
+  const parentHost = location.hostname || 'localhost';
+  twitchEmbed = new Twitch.Embed('twitch-player', {
+    width: '100%',
+    height: '100%',
+    channel: TWITCH_CHANNEL,
+    layout: 'video',
+    muted: true,
+    parent: [parentHost],
   });
 }
-function addStaff(){
-  if(!isLoggedIn() || role()!=='admin') return;
-  const u=document.getElementById('newUser').value.trim();
-  const p=document.getElementById('newPass').value.trim();
-  if(!u||!p) return;
-  const users=loadUsers();
-  if(users.some(x=>x.username===u)) return alert('User already exists.');
-  users.push({username:u,password:p,role:'staff'});
-  saveUsers(users);
-  document.getElementById('newUser').value=''; document.getElementById('newPass').value='';
-  renderUsers();
-}
-function removeUser(idx){
-  if(!isLoggedIn() || role()!=='admin') return;
-  const users=loadUsers();
-  users.splice(idx,1);
-  saveUsers(users);
-  renderUsers();
-}
 
-/* ========= Social links + images ========= */
-const socialKeys=['twitch','tiktok','kick','onlyfans'];
-function applyLinks(){
-  socialKeys.forEach(k=>{
-    const url = localStorage.getItem('link_'+k);
-    const a = document.getElementById('link_'+k);
-    if(url && a) a.href = url;
-  });
-}
-function applyImages(){
-  ['twitch','tiktok','kick'].forEach(k=>{
-    const saved = localStorage.getItem('img_'+k);
-    const img = document.getElementById('img_'+k);
-    if(saved && img) img.src = saved;
-  });
-}
-function saveLink(key){
-  if(!isLoggedIn()) return;
-  const el = document.getElementById('in_'+key);
-  const a = document.getElementById('link_'+key);
-  if(!el || !a) return;
-  const val=el.value.trim(); if(!val) return;
-  localStorage.setItem('link_'+key,val);
-  a.href=val;
-}
-function saveImg(key){
-  if(!isLoggedIn()) return;
-  const el=document.getElementById('imgurl_'+key);
-  const img=document.getElementById('img_'+key);
-  if(!el || !img) return;
-  const val=el.value.trim(); if(!val) return;
-  localStorage.setItem('img_'+key, val);
-  img.src = val;
-}
-
-/* ========= Discord status text ========= */
-function saveText(targetId,inputId){
-  if(!isLoggedIn()) return;
-  const el=document.getElementById(inputId);
-  const target=document.getElementById(targetId);
-  if(!el || !target) return;
-  const val=el.value.trim(); if(!val) return;
-  localStorage.setItem(targetId,val);
-  target.textContent=val;
-}
-
-/* ========= Prefill inputs ========= */
-function prefillInputs(){
-  socialKeys.forEach(k=>{
-    const el=document.getElementById('in_'+k);
-    const a=document.getElementById('link_'+k);
-    if(el && a){ el.value = localStorage.getItem('link_'+k) || a.href; }
-  });
-  ['twitch','tiktok','kick'].forEach(k=>{
-    const el=document.getElementById('imgurl_'+k);
-    if(el) el.value = localStorage.getItem('img_'+k) || "";
-  });
-  const st = localStorage.getItem('discord-status');
-  const ds = document.getElementById('discord-status');
-  const inD = document.getElementById('in_discord');
-  if (st && ds) ds.textContent = st;
-  if (inD) inD.value = st || (ds ? ds.textContent : '');
-  const tokBox = document.getElementById('spotify_token');
-  if (tokBox) tokBox.value = localStorage.getItem('spotify_access_token') || "";
-}
-
-/* ========= Spotify Now Playing ========= */
-function saveSpotifyToken(){
-  if(!isLoggedIn()) return;
+/* Spotify Now Playing */
+function saveSpotifyToken() {
   const box = document.getElementById('spotify_token');
-  if (!box) return;
-  const t = (box.value || "").trim();
-  if(!t) return;
-  localStorage.setItem('spotify_access_token', t);
-  updateSpotifyNowPlaying(true);
-}
-let spotifyTimer = null;
-async function fetchSpotifyCurrentlyPlaying(token){
-  const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
-  if(res.status === 204) return null;
-  if(!res.ok){
-    const text = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+  const t = (box?.value || '').trim();
+  if (!t) { alert('Paste a Spotify Access Token first.'); return; }
+  try {
+    localStorage.setItem('spotify_access_token', t);
+    alert('Spotify token saved in this browser.');
+    updateSpotifyNowPlaying();
+  } catch {
+    alert('Could not save token in this browser.');
   }
-  return res.json();
 }
-async function updateSpotifyNowPlaying(){
-  const token = localStorage.getItem('spotify_access_token') || '';
+
+let spotifyTimer = null;
+async function updateSpotifyNowPlaying() {
   const el = document.getElementById('spotify-track');
-  if(!el) return;
-  if(!token){
-    el.textContent = 'Spotify: Not Connected';
-  } else {
-    try{
-      const data = await fetchSpotifyCurrentlyPlaying(token);
-      if(!data || !data.item){
+  if (!el) return;
+
+  let token = '';
+  try { token = localStorage.getItem('spotify_access_token') || ''; } catch {}
+  if (!token) { el.textContent = 'Spotify: Not Connected'; return; }
+
+  try {
+    const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (res.status === 204) {
+      el.textContent = 'Spotify: Not Playing';
+    } else if (!res.ok) {
+      el.textContent = 'Spotify: Re-auth needed';
+    } else {
+      const data = await res.json();
+      if (!data || !data.item) {
         el.textContent = 'Spotify: Not Playing';
-      }else{
+      } else {
         const name = data.item.name;
-        const artists = (data.item.artists||[]).map(a=>a.name).join(', ');
+        const artists = (data.item.artists || []).map(a => a.name).join(', ');
         el.textContent = `${name} — ${artists}`;
       }
-    }catch(err){
-      console.error('Spotify error:', err);
-      el.textContent = 'Spotify: Re-auth needed';
     }
+  } catch {
+    el.textContent = 'Spotify: Error';
   }
+
   clearTimeout(spotifyTimer);
   spotifyTimer = setTimeout(updateSpotifyNowPlaying, 15000);
 }
 
-/* ========= Twitch Embed + Live status (Helix) ========= */
-const TWITCH_CHANNEL  = 'ThatLegendJackk';
-const TW_LS_CLIENT_ID = 'twitch_client_id';
-const TW_LS_TOKEN     = 'twitch_access_token';
-let twitchPlayer = null;
-let liveCheckTimer = null;
+/* Discord Presence via env (/api/config) */
+let DISCORD_USER_ID = '';
 
-function createTwitchPlayer(){
-  if(twitchPlayer) return twitchPlayer;
-  const host = location.hostname || 'localhost';
-  if (typeof Twitch === 'undefined' || !Twitch.Embed) return null;
-  twitchPlayer = new Twitch.Embed("twitch-player", {
-    width: "100%", height: "100%",
-    channel: TWITCH_CHANNEL, layout: "video", muted: true,
-    parent: [host]
-  });
-  return twitchPlayer;
-}
-async function helixGet(path, params = {}){
-  const CLIENT_ID = localStorage.getItem(TW_LS_CLIENT_ID) || '';
-  const TOKEN     = localStorage.getItem(TW_LS_TOKEN) || '';
-  if(!CLIENT_ID || !TOKEN) return { missingCreds:true };
-  const url = new URL(`https://api.twitch.tv/helix/${path}`);
-  Object.entries(params).forEach(([k,v])=>{ if(v!==undefined && v!==null && v!=='') url.searchParams.set(k,v); });
-  const res = await fetch(url, { headers: { 'Client-Id': CLIENT_ID, 'Authorization': `Bearer ${TOKEN}` } });
-  if(!res.ok){ const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
-  return res.json();
-}
-function setOfflineOverlay(show){
-  const el = document.getElementById('twitch-offline');
-  if(!el) return;
-  if(show) el.classList.add('offline-show'); else el.classList.remove('offline-show');
-}
-async function updateTwitchLiveStatus(){
-  try{
-    const result = await helixGet('streams', { user_login: TWITCH_CHANNEL });
-    if(result && result.missingCreds){
-      createTwitchPlayer();
-      setOfflineOverlay(false); // no creds → just show player
-    } else {
-      const live = Array.isArray(result.data) && result.data.length > 0;
-      createTwitchPlayer();
-      setOfflineOverlay(!live);
-    }
-  }catch(err){
-    console.error('Twitch live check error:', err);
-    setOfflineOverlay(true);
-  }finally{
-    clearTimeout(liveCheckTimer);
-    liveCheckTimer = setTimeout(updateTwitchLiveStatus, 60000);
+async function loadConfig() {
+  try {
+    const cfg = await api('/api/config'); // { discord_user_id }
+    DISCORD_USER_ID = cfg?.discord_user_id || '';
+    if (DISCORD_USER_ID) connectLanyard();
+    else console.warn('No DISCORD_USER_ID set on server.');
+  } catch (e) {
+    console.warn('Failed to load /api/config:', e.message);
   }
 }
 
-/* ========= Leaderboards: Bits + Gifted Subs ========= */
-/* Bits credentials persistence */
-const LS_CLIENT_ID = 'twitch_client_id';
-const LS_TOKEN     = 'twitch_access_token';
-let CLIENT_ID = "";
-let TOKEN     = "";
-
-function loadBitsCreds(){
-  CLIENT_ID = localStorage.getItem(LS_CLIENT_ID) || "";
-  TOKEN     = localStorage.getItem(LS_TOKEN) || "";
-  const ciEl = document.getElementById('ci');
-  const tkEl = document.getElementById('tk');
-  if (ciEl) ciEl.value = CLIENT_ID;
-  if (tkEl) tkEl.value = TOKEN;
+function connectLanyard() {
+  if (!DISCORD_USER_ID) return;
+  const ws = new WebSocket('wss://lanyard.cnrad.dev/socket');
+  ws.addEventListener('open', () => {
+    ws.send(JSON.stringify({ op: 2, d: { subscribe_to_id: DISCORD_USER_ID } }));
+  });
+  ws.addEventListener('message', (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.t === 'INIT_STATE' || msg.t === 'PRESENCE_UPDATE') {
+        const data = msg.d[DISCORD_USER_ID] || msg.d;
+        const s = document.getElementById('discord-status');
+        if (!s) return;
+        const state = data?.discord_status || 'offline';
+        s.textContent = 'Discord: ' + state.charAt(0).toUpperCase() + state.slice(1);
+      }
+    } catch {}
+  });
+  ws.addEventListener('close', () => setTimeout(connectLanyard, 3000));
 }
-function saveBitsCreds(ci, tk){
-  localStorage.setItem(LS_CLIENT_ID, ci);
-  localStorage.setItem(LS_TOKEN, tk);
-  CLIENT_ID = ci; TOKEN = tk;
+
+/* Gifted Subs (local; server optional) */
+const SUBS_KEY = 'gifted_subs_alltime_v1';
+
+function lsGetSubs() { try { return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); } catch { return []; } }
+function lsSetSubs(v) { try { localStorage.setItem(SUBS_KEY, JSON.stringify(v)); } catch {} }
+
+async function loadSubs() {
+  const box = document.getElementById('subs-list');
+  if (!box) return;
+
+  try {
+    const subs = await api('/api/subs');
+    renderSubsTable(subs, box);
+    return;
+  } catch {}
+
+  renderSubsTable(lsGetSubs(), box);
+}
+
+function renderSubsTable(rows, box) {
+  if (!rows || !rows.length) { box.innerHTML = '<p>No subs yet.</p>'; return; }
+  const sorted = [...rows].sort((a, b) => (b.gifts || 0) - (a.gifts || 0));
+  const tr = sorted.map((s, i) =>
+    `<tr><td>${i + 1}</td><td>${s.username || s.user}</td><td>${s.gifts}</td></tr>`
+  ).join('');
+  box.innerHTML = `<table><thead><tr><th>#</th><th>User</th><th>Gifted</th></tr></thead><tbody>${tr}</tbody></table>`;
+}
+
+async function addOrUpdateSub() {
+  const u = (document.getElementById('sub_user')?.value || '').trim();
+  const n = parseInt(document.getElementById('sub_gifts')?.value || '0', 10);
+  if (!u || isNaN(n)) return alert('Enter username and gifts.');
+
+  try {
+    await api('/api/subs', { method: 'POST', body: { username: u, gifts: n } });
+    await loadSubs();
+    return;
+  } catch {}
+
+  const list = lsGetSubs();
+  const i = list.findIndex(x => (x.username || x.user || '').toLowerCase() === u.toLowerCase());
+  if (i >= 0) {
+    list[i].gifts = n;
+    list[i].username = list[i].username || list[i].user || u;
+  } else {
+    list.push({ username: u, gifts: n });
+  }
+  lsSetSubs(list);
+  await loadSubs();
+}
+
+async function resetSubs() {
+  if (!confirm('Reset all gifted subs?')) return;
+
+  try {
+    const subs = await api('/api/subs');
+    for (const r of subs) {
+      await fetch(`/api/subs/${encodeURIComponent(r.username)}`, { method: 'DELETE', credentials: 'include' });
+    }
+    await loadSubs();
+    return;
+  } catch {}
+
+  try { localStorage.removeItem(SUBS_KEY); } catch {}
+  await loadSubs();
+}
+
+/* Twitch Bits (Helix via client creds) */
+function saveTwitchCreds() {
+  const idEl = document.getElementById('twitch_client_id');
+  const tkEl = document.getElementById('twitch_access_token');
+  const cid = (idEl?.value || '').trim();
+  const tok = (tkEl?.value || '').trim();
+  if (!cid || !tok) return alert('Paste both Client ID and Access Token');
+  try {
+    localStorage.setItem('twitch_client_id', cid);
+    localStorage.setItem('twitch_access_token', tok);
+    alert('Saved in this browser.');
+  } catch {
+    alert('Could not save in this browser.');
+  }
 }
 
 async function helix(path, params = {}) {
+  const cid = localStorage.getItem('twitch_client_id') || '';
+  const tok = localStorage.getItem('twitch_access_token') || '';
+  if (!cid || !tok) throw new Error('Missing Twitch credentials (client id / access token).');
+
   const url = new URL(`https://api.twitch.tv/helix/${path}`);
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== '' && v !== null) url.searchParams.set(k, v);
+    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
   });
-  const res = await fetch(url, { headers: { "Client-Id": CLIENT_ID, "Authorization": `Bearer ${TOKEN}` } });
-  if (!res.ok) { const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
+
+  const res = await fetch(url, { headers: { 'Client-Id': cid, 'Authorization': `Bearer ${tok}` } });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+  }
   return res.json();
 }
+
 async function getUsersMap(userIds) {
   if (!userIds.length) return new Map();
-  const url = new URL("https://api.twitch.tv/helix/users");
-  userIds.forEach(id => url.searchParams.append("id", id));
-  const res = await fetch(url, { headers: { "Client-Id": CLIENT_ID, "Authorization": `Bearer ${TOKEN}` } });
-  if (!res.ok) throw new Error(await res.text());
+  const cid = localStorage.getItem('twitch_client_id') || '';
+  const tok = localStorage.getItem('twitch_access_token') || '';
+
+  const url = new URL('https://api.twitch.tv/helix/users');
+  userIds.forEach(id => url.searchParams.append('id', id));
+
+  const res = await fetch(url, { headers: { 'Client-Id': cid, 'Authorization': `Bearer ${tok}` } });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+  }
   const { data } = await res.json();
   const map = new Map();
   for (const u of data) map.set(u.id, u);
   return map;
 }
-async function updateBitsLeaderboard() {
-  const setup = document.getElementById('bitsSetup');
-  const tbody = document.querySelector("#bits-table tbody");
-  if (!tbody) return;
-  if (!(CLIENT_ID && TOKEN)) {
-    if (setup) setup.style.display = 'block';
-    tbody.innerHTML = `<tr><td colspan="3">Please add your <strong>Client ID</strong> and <strong>Access Token</strong> above.</td></tr>`;
-    return;
-  }
+
+async function refreshBits() {
+  const listEl = document.getElementById('bits-list');
+  if (!listEl) return;
+
+  const count = Math.min(Math.max(parseInt(document.getElementById('bits_count')?.value || '10', 10), 1), 10);
+  const period = document.getElementById('bits_period')?.value || 'all';
+  listEl.innerHTML = '<p>Loading…</p>';
+
   try {
-    const { data: entries } = await helix("bits/leaderboard", { count: 10, period: "all" });
+    const { data: entries } = await helix('bits/leaderboard', { count, period });
     const ids = [...new Set(entries.map(e => e.user_id).filter(Boolean))];
     const usersMap = await getUsersMap(ids);
-    tbody.innerHTML = entries.map(e => {
+
+    if (!entries.length) { listEl.innerHTML = '<p>No results.</p>'; return; }
+
+    const rows = entries.map(e => {
       const u = usersMap.get(e.user_id);
-      const name = u?.display_name || u?.login || e.user_id;
-      return `<tr><td>${e.rank}</td><td>${name}</td><td>${(+e.score).toLocaleString()}</td></tr>`;
+      const name = u?.display_name || u?.login || e.user_name || e.user_login || e.user_id;
+      return `<tr><td>${e.rank}</td><td>${name}</td><td>${e.score}</td></tr>`;
     }).join('');
-    if (setup) setup.style.display = 'none';
+
+    listEl.innerHTML = `<table><thead><tr><th>#</th><th>User</th><th>Bits</th></tr></thead><tbody>${rows}</tbody></table>`;
   } catch (err) {
-    console.error("Error fetching leaderboard:", err);
-    if (setup) setup.style.display = 'block';
-    tbody.innerHTML = `<tr><td colspan="3">Error: ${err.message}</td></tr>`;
+    listEl.innerHTML = `
+      <div style="padding:.6rem;background:rgba(0,0,0,.35);border-radius:8px">
+        <p><strong>Error:</strong> ${err.message}</p>
+        <p>Use a <em>User access token</em> with <code>bits:read</code> scope and matching Client ID.</p>
+      </div>`;
   }
 }
-(function wireBitsSetup(){
-  const apply = document.getElementById('apply');
-  const clear = document.getElementById('clear');
-  if (apply) apply.addEventListener('click', ()=>{
-    const ci = (document.getElementById('ci').value || "").trim();
-    const tk = (document.getElementById('tk').value || "").trim();
-    if(!ci || !tk){ alert("Please paste both CLIENT_ID and ACCESS TOKEN (bits:read)."); return; }
-    saveBitsCreds(ci, tk);
-    updateBitsLeaderboard();
-  });
-  if (clear) clear.addEventListener('click', ()=>{
-    if(!confirm("Clear saved Client ID and Access Token from this browser?")) return;
-    localStorage.removeItem(LS_CLIENT_ID);
-    localStorage.removeItem(LS_TOKEN);
-    CLIENT_ID = ""; TOKEN = "";
-    const ciEl=document.getElementById('ci'); const tkEl=document.getElementById('tk');
-    if (ciEl) ciEl.value = ""; if (tkEl) tkEl.value = "";
-    const setup = document.getElementById('bitsSetup');
-    if (setup) setup.style.display = 'block';
-    updateBitsLeaderboard();
-  });
-})();
 
-/* Gifted Subs (admin editable) */
-const SUBS_KEY='giftedSubsTable';
-function loadSubs(){ try{return JSON.parse(localStorage.getItem(SUBS_KEY)||'[]')}catch{return[]} }
-function saveSubs(arr){ localStorage.setItem(SUBS_KEY, JSON.stringify(arr)); }
-function renderSubs(){
-  const body=document.getElementById('subs-body');
-  if (!body) return;
-  const data=loadSubs().sort((a,b)=>b.count-a.count);
-  body.innerHTML='';
-  if(!data.length){ body.innerHTML='<tr><td colspan="4">No entries yet</td></tr>'; }
-  const isAdmin = isLoggedIn() && role()==='admin';
-  data.forEach((row,i)=>{
-    const safeUser = String(row.user).replace(/'/g,"&#39;");
-    body.insertAdjacentHTML('beforeend',
-      `<tr><td>${i+1}</td><td>${row.user}</td><td>${row.count}</td>
-       <td class="adminCol">${isAdmin?`<button onclick="removeSub('${safeUser}')">Remove</button>`:''}</td></tr>`);
-  });
-  document.querySelectorAll('.adminCol').forEach(td=> td.style.display=(isLoggedIn() && role()==='admin')?'table-cell':'none');
-  const sa = document.getElementById('subsAdmin');
-  if (sa) sa.style.display = (isLoggedIn() && role()==='admin') ? 'block' : 'none';
-}
-function addSub(){
-  if(!(isLoggedIn() && role()==='admin')) return;
-  const u=document.getElementById('subUser').value.trim();
-  const c=parseInt(document.getElementById('subCount').value,10);
-  if(!u||isNaN(c)) return;
-  const d=loadSubs();
-  const idx=d.findIndex(x=>x.user.toLowerCase()===u.toLowerCase());
-  if(idx>-1){ d[idx].count=c } else { d.push({user:u,count:c}) }
-  saveSubs(d);
-  document.getElementById('subUser').value=''; document.getElementById('subCount').value='';
-  renderSubs();
-}
-function removeSub(user){
-  if(!(isLoggedIn() && role()==='admin')) return;
-  const d=loadSubs().filter(x=>x.user!==user);
-  saveSubs(d);
-  renderSubs();
-}
-function clearSubs(){
-  if(!(isLoggedIn() && role()==='admin')) return;
-  if(confirm('Clear all gifted subs?')){ saveSubs([]); renderSubs(); }
-}
-
-/* ========= About content (staff editable) ========= */
-const ABOUT_KEY='about_content';
-function loadAbout(){
-  const val=localStorage.getItem(ABOUT_KEY) || "Welcome to my About page!";
-  const view=document.getElementById('view');
-  if (view) view.textContent=val;
-}
-function saveAbout(){
-  if(!isLoggedIn()) return;
-  const txt=document.getElementById('aboutTxt');
-  if(!txt) return;
-  const v=txt.value.trim();
-  if(!v) return;
-  localStorage.setItem(ABOUT_KEY,v);
-  loadAbout();
-  alert('Saved.');
-}
-function setupAbout(){
-  loadAbout();
-  const staff = isLoggedIn();
-  const ed = document.getElementById('editor');
-  const txt = document.getElementById('aboutTxt');
-  if (ed) ed.style.display = staff ? 'block':'none';
-  if (txt && staff) txt.value = localStorage.getItem(ABOUT_KEY)||'';
-}
-
-/* ========= Boot ========= */
+/* Boot */
 window.addEventListener('DOMContentLoaded', () => {
-  // Default route
   showSection('home');
 
-  // Socials & images
-  applyLinks();
-  applyImages();
-
-  // Panels/auth
-  showAuth();
-  showPanels();
-
-  // Saved discord text
-  const savedDiscord=localStorage.getItem('discord-status');
-  if(savedDiscord){
-    const ds = document.getElementById('discord-status');
-    if (ds) ds.textContent=savedDiscord;
-  }
-
   // Twitch embed
-  function ensureTwitch() {
-    if (typeof Twitch === 'undefined' || !Twitch.Embed) return setTimeout(ensureTwitch, 200);
-    createTwitchPlayer();
-    updateTwitchLiveStatus();
+  if (typeof Twitch === 'undefined') {
+    const twitchScript = document.createElement('script');
+    twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
+    twitchScript.onload = () => initTwitch();
+    document.head.appendChild(twitchScript);
+  } else {
+    initTwitch();
   }
-  ensureTwitch();
 
   // Spotify poll
   updateSpotifyNowPlaying();
 
-  // Leaderboards
-  loadBitsCreds();
-  updateBitsLeaderboard();
-  setInterval(updateBitsLeaderboard, 60000);
-  renderSubs();
+  // Discord presence (env via /api/config)
+  loadConfig();
 
-  // About
-  setupAbout();
+  // Leaderboards (subs)
+  loadSubs();
+
+  // Prefill saved Twitch creds
+  const idEl = document.getElementById('twitch_client_id');
+  const tkEl = document.getElementById('twitch_access_token');
+  if (idEl) idEl.value = localStorage.getItem('twitch_client_id') || '';
+  if (tkEl) tkEl.value = localStorage.getItem('twitch_access_token') || '';
 });
