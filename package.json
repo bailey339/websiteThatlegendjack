@@ -1,21 +1,17 @@
 {
-  "name": "legendjack-web-service",
+  "name": "thatlegendjack-site",
   "version": "1.0.0",
-  "description": "ThatLegendJack site (Express web service for Render)",
   "main": "server.js",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
-  },
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.18.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.3"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "dependencies": {
+    "cookie-session": "^2.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
 }
