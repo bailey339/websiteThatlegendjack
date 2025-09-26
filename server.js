@@ -10,15 +10,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// CRITICAL FIX: Trust Render's proxy
+app.set('trust proxy', 1);
+
 app.use(express.json());
 
-// Cookie session (used for Spotify OAuth tokens)
+// FIXED Cookie session configuration
 app.use(cookieSession({
   name: 'tlj_sess',
   keys: [process.env.SESSION_SECRET || 'dev_change_me'],
   httpOnly: true,
   sameSite: 'lax',
-  secure: true,
+  secure: false, // ← CHANGED TO FALSE to work on Render
   maxAge: 30 * 24 * 60 * 60 * 1000
 }));
 
