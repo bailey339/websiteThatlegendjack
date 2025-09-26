@@ -4,79 +4,214 @@ function $(sel){ return document.querySelector(sel); }
 function showSection(id){
   document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
   const target = document.getElementById(id);
-  if (target){ target.classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); }
+  if (target){ 
+    target.classList.remove('hidden'); 
+    window.scrollTo({top:0,behavior:'smooth'}); 
+    safe(() => $('.back-btn').style.display = id === 'home' ? 'none' : 'block');
+  }
 }
 
-/* ===== Auth (client-side demo) ===== */
-const ADMIN_USER = "ThatLegendJack";
-const ADMIN_PASS = "BooBear24/7";
-
-function setRole(r){ try{ localStorage.setItem('role', r);}catch{} }
-function getRole(){ try{ return localStorage.getItem('role') || 'guest'; }catch{ return 'guest'; } }
-
-function doLogout(){ setRole('guest'); location.href = '/'; }
-function doLogin(e){
+/* ===== Auth ===== */
+async function doLogin(e){
   e.preventDefault();
   const u = $('#username')?.value?.trim() || '';
   const p = $('#password')?.value?.trim() || '';
-  if (u === ADMIN_USER && p === ADMIN_PASS) { setRole('staff'); location.href = '/'; }
-  else alert('Invalid credentials');
-}
-function applyRoleUI(){
-  const isStaff = getRole() === 'staff';
-  safe(()=>$('#loginBtn').classList.toggle('hidden', isStaff));
-  safe(()=>$('#logoutBtn').classList.toggle('hidden', !isStaff));
-  safe(()=>$('#about-box').contentEditable = isStaff ? 'true' : 'false');
-  safe(()=>$('#subs-controls').classList.toggle('hidden', !isStaff));
+  
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const result = await r.json();
+    if (result.success) {
+      location.href = '/';
+    } else {
+      alert('Invalid credentials');
+    }
+  } catch (e) {
+    alert('Login failed: ' + e.message);
+  }
 }
 
-/* ===== About ===== */
-function toggleAboutEdit(enable=true){
-  safe(()=>{ $('#about-box').contentEditable = enable ? 'true' : 'false'; });
-  safe(()=>{ $('#about-save-row').classList.toggle('hidden', !enable); });
+async function doLogout(){
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/';
+  } catch (e) {
+    location.href = '/';
+  }
 }
-function saveAbout(){
+
+async function checkAuth(){
+  try {
+    const r = await fetch('/api/auth/status');
+    const data = await r.json();
+    applyRoleUI(data.role === 'staff');
+  } catch (e) {
+    applyRoleUI(false);
+  }
+}
+
+function applyRoleUI(isStaff){
+  safe(() => $('#loginBtn').classList.toggle('hidden', isStaff));
+  safe(() => $('#logoutBtn').classList.toggle('hidden', !isStaff));
+  safe(() => $('#about-box').contentEditable = isStaff ? 'true' : 'false'));
+  safe(() => $('#subs-controls').classList.toggle('hidden', !isStaff));
+  safe(() => $('#url-management').classList.toggle('hidden', !isStaff));
+}
+
+/* ===== Social URL Management ===== */
+async function loadSocialUrls(){
+  try {
+    const r = await fetch('/api/social-urls');
+    const urls = await r.json();
+    safe(() => {
+      $('#twitch_url').value = urls.twitch || '';
+      $('#tiktok_url').value = urls.tiktok || '';
+      $('#kick_url').value = urls.kick || '';
+      $('#onlyfans_url').value = urls.onlyfans || '';
+    });
+    updateSocialLinks(urls);
+  } catch (e) {
+    console.warn('Failed to load social URLs:', e);
+  }
+}
+
+async function saveSocialUrls(){
+  const urls = {
+    twitch: $('#twitch_url')?.value?.trim() || '',
+    tiktok: $('#tiktok_url')?.value?.trim() || '',
+    kick: $('#kick_url')?.value?.trim() || '',
+    onlyfans: $('#onlyfans_url')?.value?.trim() || ''
+  };
+  
+  try {
+    const r = await fetch('/api/social-urls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(urls)
+    });
+    const result = await r.json();
+    if (result.success) {
+      updateSocialLinks(urls);
+      alert('URLs saved successfully!');
+    } else {
+      alert('Failed to save URLs');
+    }
+  } catch (e) {
+    alert('Error saving URLs: ' + e.message);
+  }
+}
+
+function updateSocialLinks(urls){
+  safe(() => {
+    const twitchLink = document.querySelector('.social[aria-label="Twitch"]');
+    const tiktokLink = document.querySelector('.social[aria-label="TikTok"]');
+    const kickLink = document.querySelector('.social[aria-label="Kick"]');
+    const onlyfansLink = document.querySelector('.social[aria-label="OnlyFans"]');
+    
+    if (twitchLink && urls.twitch) twitchLink.href = urls.twitch;
+    if (tiktokLink && urls.tiktok) tiktokLink.href = urls.tiktok;
+    if (kickLink && urls.kick) kickLink.href = urls.kick;
+    if (onlyfansLink && urls.onlyfans) onlyfansLink.href = urls.onlyfans;
+  });
+}
+
+/* ===== About Content ===== */
+async function loadAbout(){
+  try {
+    const r = await fetch('/api/about');
+    const data = await r.json();
+    if (data.content && $('#about-box')) {
+      $('#about-box').innerHTML = data.content;
+    }
+  } catch (e) {
+    console.warn('Failed to load about content:', e);
+  }
+}
+
+async function saveAbout(){
   const html = $('#about-box')?.innerHTML || '';
-  try{ localStorage.setItem('about_html', html); }catch{}
-  toggleAboutEdit(false);
-  alert('About saved');
-}
-function loadAbout(){
-  try{
-    const html = localStorage.getItem('about_html');
-    if (html) $('#about-box').innerHTML = html;
-  }catch{}
+  try {
+    const r = await fetch('/api/about', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: html })
+    });
+    const result = await r.json();
+    if (result.success) {
+      toggleAboutEdit(false);
+      alert('About saved to database!');
+    } else {
+      alert('Failed to save about content');
+    }
+  } catch (e) {
+    alert('Error saving about: ' + e.message);
+  }
 }
 
-/* ===== Subs (local) ===== */
-const SUBS_KEY = 'gifted_subs_alltime_v1';
-function lsGetSubs(){ try{ return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); }catch{return [];} }
-function lsSetSubs(v){ try{ localStorage.setItem(SUBS_KEY, JSON.stringify(v)); }catch{} }
+function toggleAboutEdit(enable=true){
+  safe(() => { $('#about-box').contentEditable = enable ? 'true' : 'false'; });
+  safe(() => { $('#about-save-row').classList.toggle('hidden', !enable); });
+}
 
-function addOrUpdateSub(){
+/* ===== Gifted Subs ===== */
+async function loadSubs(){
+  try {
+    const r = await fetch('/api/subs');
+    const subs = await r.json();
+    renderSubs(subs);
+  } catch (e) {
+    console.warn('Failed to load subs:', e);
+  }
+}
+
+async function addOrUpdateSub(){
   const u = $('#sub_user')?.value?.trim();
   const n = parseInt($('#sub_gifts')?.value || '0', 10);
   if (!u || isNaN(n)) return alert('Enter username and gifts');
-  const list = lsGetSubs();
-  const i = list.findIndex(x => (x.username || x.user || '').toLowerCase() === u.toLowerCase());
-  if (i >= 0) { list[i].gifts = n; list[i].username = list[i].username || list[i].user || u; }
-  else { list.push({ username: u, gifts: n }); }
-  lsSetSubs(list);
-  renderSubs();
+  
+  try {
+    const r = await fetch('/api/subs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, gifts: n })
+    });
+    const result = await r.json();
+    if (result.success) {
+      $('#sub_user').value = '';
+      $('#sub_gifts').value = '';
+      loadSubs();
+    } else {
+      alert('Failed to save sub');
+    }
+  } catch (e) {
+    alert('Error saving sub: ' + e.message);
+  }
 }
-function resetSubs(){
+
+async function resetSubs(){
   if (!confirm('Reset all gifted subs?')) return;
-  try{ localStorage.removeItem(SUBS_KEY); }catch{}
-  renderSubs();
+  try {
+    const r = await fetch('/api/subs', { method: 'DELETE' });
+    const result = await r.json();
+    if (result.success) {
+      loadSubs();
+    } else {
+      alert('Failed to reset subs');
+    }
+  } catch (e) {
+    alert('Error resetting subs: ' + e.message);
+  }
 }
-function renderSubs(){
-  const rows = lsGetSubs();
+
+function renderSubs(subs){
   const box = $('#subs-list');
   if (!box) return;
-  if (!rows.length){ box.innerHTML = 'No subs yet.'; return; }
-  const sorted = [...rows].sort((a,b)=>(b.gifts||0)-(a.gifts||0));
+  if (!subs.length){ box.innerHTML = 'No subs yet.'; return; }
   box.innerHTML = `<table><thead><tr><th>#</th><th>User</th><th>Gifted</th></tr></thead><tbody>${
-    sorted.map((s,i)=>`<tr><td>${i+1}</td><td>${s.username||s.user}</td><td>${s.gifts}</td></tr>`).join('')
+    subs.map((s,i)=>`<tr><td>${i+1}</td><td>${s.username}</td><td>${s.gifts}</td></tr>`).join('')
   }</tbody></table>`;
 }
 
@@ -95,7 +230,7 @@ function initTwitch(){
   });
 }
 
-/* ===== Twitch Bits (client creds) ===== */
+/* ===== Twitch Bits ===== */
 function saveTwitchCreds(){
   const cid = $('#twitch_client_id')?.value?.trim();
   const tok = $('#twitch_access_token')?.value?.trim();
@@ -106,6 +241,7 @@ function saveTwitchCreds(){
     alert('Saved.');
   }catch{ alert('Could not save.'); }
 }
+
 async function helix(path, params={}){
   const cid = localStorage.getItem('twitch_client_id') || '';
   const tok = localStorage.getItem('twitch_access_token') || '';
@@ -116,6 +252,7 @@ async function helix(path, params={}){
   if (!res.ok){ const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
   return res.json();
 }
+
 async function getUsersMap(userIds){
   if (!userIds.length) return new Map();
   const cid = localStorage.getItem('twitch_client_id') || '';
@@ -128,6 +265,7 @@ async function getUsersMap(userIds){
   const map = new Map(); for (const u of data) map.set(u.id, u);
   return map;
 }
+
 async function refreshBits(){
   const listEl = $('#bits-list'); if (!listEl) return;
   const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
@@ -152,12 +290,13 @@ async function refreshBits(){
   }
 }
 
-/* ===== Discord Presence via Lanyard ===== */
+/* ===== Discord Presence ===== */
 let DISCORD_USER_ID = '';
 async function apiGet(path){
   const r = await fetch(path, { credentials:'include' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json();
 }
+
 async function loadDiscordConfig(){
   try{
     const cfg = await apiGet('/api/config');
@@ -166,6 +305,7 @@ async function loadDiscordConfig(){
     connectLanyard();
   }catch(e){ console.warn('Failed to load /api/config:', e.message); }
 }
+
 function connectLanyard(){
   if (!DISCORD_USER_ID) return;
   const ws = new WebSocket('wss://lanyard.cnrad.dev/socket');
@@ -185,53 +325,71 @@ function connectLanyard(){
   ws.addEventListener('close', () => setTimeout(connectLanyard, 3000));
 }
 
-/* ===== Spotify (OAuth via server) ===== */
+/* ===== Spotify ===== */
 function connectSpotify(){ window.location.href = '/auth/spotify/login'; }
+
 let spotifyTimer = null;
 async function updateSpotify(){
   const el = $('#spotify-track');
   const connectBox = $('#spotify-connect');
   if (!el) return;
-  try{
+  
+  try {
     const r = await fetch('/api/spotify/now-playing', { credentials:'include' });
-    if (r.status === 401){ el.textContent = 'Spotify: Not Connected'; connectBox?.classList.remove('hidden'); }
-    else if (r.ok){
+    if (r.status === 401){ 
+      el.textContent = 'Spotify: Not Connected'; 
+      connectBox?.classList.remove('hidden'); 
+    } else if (r.ok){
       const data = await r.json();
       if (!data || data.playing === false || !data.item){
         el.textContent = 'Spotify: Not Playing';
       } else {
-        const name = data.item?.name;
-        const artists = (data.item?.artists || []).map(a => a.name).join(', ');
-        el.textContent = `${name || 'Unknown'} — ${artists || ''}`;
+        const name = data.item?.name || 'Unknown';
+        const artists = (data.item?.artists || []).map(a => a.name).join(', ') || 'Unknown Artist';
+        el.textContent = `${name} — ${artists}`;
+        el.title = `${name} by ${artists}`;
       }
       connectBox?.classList.add('hidden');
     } else {
       el.textContent = 'Spotify: Not Connected';
       connectBox?.classList.remove('hidden');
     }
-  }catch{
+  } catch {
     el.textContent = 'Spotify: Not Connected';
     connectBox?.classList.remove('hidden');
   }
+  
   clearTimeout(spotifyTimer);
   spotifyTimer = setTimeout(updateSpotify, 15000);
 }
 
+async function checkSpotifyStatus(){
+  try {
+    const r = await fetch('/api/spotify/status');
+    const data = await r.json();
+    if (data.connected) {
+      $('#spotify-connect').classList.add('hidden');
+    }
+  } catch (e) {}
+}
+
 /* ===== Boot ===== */
 window.addEventListener('DOMContentLoaded', () => {
-  // Robust nav: also bind programmatically in case inline onclicks are ignored
+  // Nav
   const map = { home:'home', about:'about', leaderboards:'leaderboards' };
   document.querySelectorAll('.nav-center .nav-box').forEach(btn=>{
     btn.addEventListener('click', () => {
-      const id = [...btn.classList].find(c => map[c]); // home/about/leaderboards
+      const id = [...btn.classList].find(c => map[c]);
       showSection(map[id] || 'home');
     });
   });
 
   showSection('home');
-  applyRoleUI();
+  checkAuth();
   loadAbout();
-  renderSubs();
+  loadSubs();
+  loadSocialUrls();
+  checkSpotifyStatus();
 
   // Twitch embed
   if (typeof Twitch === 'undefined') {
@@ -245,15 +403,16 @@ window.addEventListener('DOMContentLoaded', () => {
   loadDiscordConfig();
   updateSpotify();
 
-  // Prefill saved Twitch creds (optional)
+  // Prefill Twitch creds
   const idEl = $('#twitch_client_id');
   const tkEl = $('#twitch_access_token');
   if (idEl) idEl.value = localStorage.getItem('twitch_client_id') || '';
   if (tkEl) tkEl.value = localStorage.getItem('twitch_access_token') || '';
 
-  // Extra: Bind buttons safely (if inline blocked by CSP)
+  // Bind buttons
   $('#bits_refresh_btn')?.addEventListener('click', e => { e.preventDefault(); refreshBits(); });
   $('#subs_add_btn')?.addEventListener('click', e => { e.preventDefault(); addOrUpdateSub(); });
   $('#subs_reset_btn')?.addEventListener('click', e => { e.preventDefault(); resetSubs(); });
   $('#twitch_save_btn')?.addEventListener('click', e => { e.preventDefault(); saveTwitchCreds(); });
+  $('#save_urls_btn')?.addEventListener('click', e => { e.preventDefault(); saveSocialUrls(); });
 });
