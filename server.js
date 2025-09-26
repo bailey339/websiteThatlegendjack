@@ -79,26 +79,136 @@ app.post('/api/social-links', express.json(), (req, res) => {
   res.json({ success: true });
 });
 
-/* ---------- Global Spotify (your account) ---------- */
-const YOUR_SPOTIFY_ACCESS_TOKEN = process.env.YOUR_SPOTIFY_ACCESS_TOKEN || '';
+/* ---------- Spotify OAuth (FIXED FOR RENDER) ---------- */
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
+const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback';
 
-app.get('/api/spotify/global-now-playing', async (req, res) => {
+const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
+const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
+const NOW_PLAYING_URL = 'https://api.spotify.com/v1/me/player/currently-playing';
+
+function authUrl(state) {
+  const scope = 'user-read-currently-playing user-read-playback-state';
+  const q = new URLSearchParams({
+    response_type: 'code',
+    client_id: SPOTIFY_CLIENT_ID,
+    scope: scope,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    state: state,
+    show_dialog: 'false'
+  });
+  return `${SPOTIFY_AUTH_URL}?${q}`;
+}
+
+app.get('/auth/spotify/login', (req, res) => {
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    return res.status(500).send('Spotify credentials missing');
+  }
+  const state = Math.random().toString(36).slice(2);
+  req.session.spotify_state = state;
+  res.redirect(authUrl(state));
+});
+
+app.get('/auth/spotify/callback', async (req, res) => {
+  const { code, state } = req.query;
+  if (!code || !state || state !== req.session.spotify_state) {
+    return res.status(400).send('Invalid state parameter');
+  }
+  
   try {
-    if (!YOUR_SPOTIFY_ACCESS_TOKEN) {
-      return res.status(501).json({ error: 'Spotify not configured' });
-    }
-    
-    const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-      headers: { Authorization: `Bearer ${YOUR_SPOTIFY_ACCESS_TOKEN}` }
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code.toString(),
+      redirect_uri: SPOTIFY_REDIRECT_URI
     });
     
-    if (r.status === 204) return res.json({ playing: false });
-    if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
+    const response = await fetch(SPOTIFY_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body
+    });
     
-    res.json(await r.json());
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    if (!response.ok) {
+      throw new Error(`Spotify token error: ${response.status}`);
+    }
+    
+    const tokenData = await response.json();
+    req.session.spotify = {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: Date.now() + (tokenData.expires_in * 1000)
+    };
+    
+    res.redirect('/');
+  } catch (error) {
+    console.error('Spotify callback error:', error);
+    res.status(500).send('Authentication failed');
   }
+});
+
+async function ensureSpotifyAccessToken(sess) {
+  if (!sess?.spotify?.refresh_token) return null;
+  if (sess.spotify.access_token && Date.now() < (sess.spotify.expires_at || 0)) return sess.spotify.access_token;
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: sess.spotify.refresh_token
+  });
+  
+  const response = await fetch(SPOTIFY_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body
+  });
+  
+  if (!response.ok) { 
+    sess.spotify = null; 
+    return null; 
+  }
+  
+  const tokenData = await response.json();
+  sess.spotify = {
+    access_token: tokenData.access_token,
+    refresh_token: sess.spotify.refresh_token,
+    expires_at: Date.now() + (tokenData.expires_in * 1000)
+  };
+  return sess.spotify.access_token;
+}
+
+app.get('/api/spotify/now-playing', async (req, res) => {
+  try {
+    const accessToken = await ensureSpotifyAccessToken(req.session);
+    if (!accessToken) {
+      return res.status(401).json({ error: 'not_connected' });
+    }
+    
+    const response = await fetch(NOW_PLAYING_URL, { 
+      headers: { Authorization: `Bearer ${accessToken}` } 
+    });
+    
+    if (response.status === 204) return res.json({ playing: false });
+    if (!response.ok) return res.status(response.status).json({ error: 'spotify_error' });
+    
+    res.json(await response.json());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Simple test endpoint
+app.get('/api/spotify/test', (req, res) => {
+  res.json({ 
+    message: 'Spotify endpoint working',
+    has_creds: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET),
+    redirect_uri: SPOTIFY_REDIRECT_URI
+  });
 });
 
 /* ---------- Minimal login page ---------- */
@@ -128,105 +238,6 @@ app.get('/login.html', (req, res) => {
   <script src="/main.js"></script>
 </body>
 </html>`);
-});
-
-/* ---------- Spotify OAuth (keep for backward compatibility) ---------- */
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3000/auth/spotify/callback').trim();
-
-const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
-const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
-const NOW_PLAYING_URL = 'https://api.spotify.com/v1/me/player/currently-playing';
-const b64 = s => Buffer.from(s, 'utf8').toString('base64');
-
-function authUrl(state) {
-  const scope = ['user-read-currently-playing', 'user-read-playback-state'].join(' ');
-  const q = new URLSearchParams({
-    response_type: 'code',
-    client_id: SPOTIFY_CLIENT_ID,
-    scope: scope,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    state: state,
-    show_dialog: 'false'
-  });
-  return `${SPOTIFY_AUTH_URL}?${q}`;
-}
-
-app.get('/auth/spotify/login', (req, res) => {
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(500).send('Spotify env missing');
-  const state = Math.random().toString(36).slice(2);
-  req.session.spotify_state = state;
-  res.redirect(authUrl(state));
-});
-
-app.get('/auth/spotify/callback', async (req, res) => {
-  const { code, state } = req.query;
-  if (!code || !state || state !== req.session.spotify_state) return res.status(400).send('Bad state');
-  try {
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code.toString(),
-      redirect_uri: SPOTIFY_REDIRECT_URI
-    });
-    const r = await fetch(SPOTIFY_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${b64(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body
-    });
-    if (!r.ok) return res.status(500).send('Token exchange failed: ' + await r.text());
-    const j = await r.json();
-    req.session.spotify = {
-      access_token: j.access_token,
-      refresh_token: j.refresh_token,
-      expires_at: Date.now() + (j.expires_in || 3600) * 1000
-    };
-    res.redirect('/');
-  } catch (e) {
-    res.status(500).send('OAuth error: ' + e.message);
-  }
-});
-
-async function ensureSpotifyAccessToken(sess) {
-  if (!sess?.spotify?.refresh_token) return null;
-  if (sess.spotify.access_token && Date.now() < (sess.spotify.expires_at || 0)) return sess.spotify.access_token;
-
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: sess.spotify.refresh_token
-  });
-  const r = await fetch(SPOTIFY_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${b64(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body
-  });
-  if (!r.ok) { sess.spotify = null; return null; }
-  const j = await r.json();
-  sess.spotify = {
-    access_token: j.access_token,
-    refresh_token: sess.spotify.refresh_token,
-    expires_at: Date.now() + (j.expires_in || 3600) * 1000
-  };
-  return sess.spotify.access_token;
-}
-
-app.get('/api/spotify/now-playing', async (req, res) => {
-  try {
-    const at = await ensureSpotifyAccessToken(req.session);
-    if (!at) return res.status(401).json({ error: 'not_connected' });
-    const r = await fetch(NOW_PLAYING_URL, { headers: { Authorization: `Bearer ${at}` } });
-    if (r.status === 204) return res.json({ playing: false });
-    if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
-    res.json(await r.json());
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 /* ---------- SPA fallback ---------- */
