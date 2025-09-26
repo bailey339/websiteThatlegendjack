@@ -78,8 +78,8 @@
     display:flex; gap:1.2rem; flex-wrap:wrap; align-items:flex-end; padding-right:10px;
   }
   .circle{
-    width:140px; height:140px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:.86rem; text-align:center; padding:10px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
+    width:160px; height:160px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:.86rem; text-align:center; padding:15px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
     overflow: hidden;
   }
   .spotify{border-color:#1DB954} .discord{border-color:#5865F2}
@@ -89,9 +89,13 @@
     display: inline-block;
     min-width: 100%;
     box-sizing: border-box;
+    padding: 0 10px;
+    text-overflow: ellipsis;
   }
   .track.scrolling {
     animation: scrollText 15s linear infinite;
+    text-overflow: unset;
+    padding: 0 20px;
   }
 
   /* LEFT social circles */
@@ -182,8 +186,10 @@
     <div id="admin-controls" class="surface hidden" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
       <h3>Admin Controls</h3>
       <div class="row">
-        <input id="social-twitch-url" placeholder="Twitch URL" style="flex:2"/>
-        <input id="social-tiktok-url" placeholder="TikTok URL" style="flex:2"/>
+        <input id="social-twitch-url" placeholder="Twitch URL" style="flex:1"/>
+        <input id="social-tiktok-url" placeholder="TikTok URL" style="flex:1"/>
+        <input id="social-kick-url" placeholder="Kick URL" style="flex:1"/>
+        <input id="social-onlyfans-url" placeholder="OnlyFans URL" style="flex:1"/>
         <button onclick="updateSocialLinks()">Update Social Links</button>
       </div>
     </div>
