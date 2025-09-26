@@ -293,7 +293,9 @@ async function updateSpotify(){
     const r = await fetch('/api/spotify/now-playing');
     
     if (r.status === 401) {
-      el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
+      el.textContent = 'Spotify: Not Connected';
+      el.title = 'Go to /auth/spotify/login to connect';
+      el.classList.remove('scrolling');
       return;
     }
     
@@ -301,7 +303,9 @@ async function updateSpotify(){
       const data = await r.json();
       
       if (data.error === 'not_connected' || !data || data.playing === false || !data.item) {
-        el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
+        el.textContent = 'Spotify: Not Playing';
+        el.title = 'Spotify: Not Playing';
+        el.classList.remove('scrolling');
       } else {
         const name = data.item?.name || 'Unknown';
         const artists = (data.item?.artists || []).map(a => a.name).join(', ');
@@ -317,18 +321,18 @@ async function updateSpotify(){
         }
       }
     } else {
-      el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
+      el.textContent = 'Spotify: Error';
+      el.title = 'Spotify: Error';
+      el.classList.remove('scrolling');
     }
   } catch (error) {
-    el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
+    el.textContent = 'Spotify: Offline';
+    el.title = 'Spotify: Offline';
+    el.classList.remove('scrolling');
   }
   
   clearTimeout(spotifyTimer);
   spotifyTimer = setTimeout(updateSpotify, 10000);
-}
-
-function connectSpotify() {
-  window.location.href = '/auth/spotify/login';
 }
 
 /* ===== Social Links Initialization ===== */
