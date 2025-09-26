@@ -178,6 +178,32 @@
         <button onclick="saveAbout()">Save About</button>
         <button style="background:#444" onclick="toggleAboutEdit(false)">Cancel</button>
       </div>
+
+      <!-- URL Management Section -->
+      <div id="url-management" class="hidden" style="margin-top: 2rem;">
+        <h3>Social Media URLs</h3>
+        <div class="card">
+          <div class="row">
+            <label>Twitch URL:</label>
+            <input id="twitch_url" type="url" placeholder="https://twitch.tv/username" style="flex:1"/>
+          </div>
+          <div class="row">
+            <label>TikTok URL:</label>
+            <input id="tiktok_url" type="url" placeholder="https://tiktok.com/@username" style="flex:1"/>
+          </div>
+          <div class="row">
+            <label>Kick URL:</label>
+            <input id="kick_url" type="url" placeholder="https://kick.com/username" style="flex:1"/>
+          </div>
+          <div class="row">
+            <label>OnlyFans URL:</label>
+            <input id="onlyfans_url" type="url" placeholder="https://onlyfans.com/username" style="flex:1"/>
+          </div>
+          <div class="row">
+            <button id="save_urls_btn" onclick="saveSocialUrls()">Save URLs</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
