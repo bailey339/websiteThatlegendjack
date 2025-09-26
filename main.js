@@ -10,6 +10,7 @@ function showSection(id){
 /* ===== Auth (client-side demo) ===== */
 const ADMIN_USER = "ThatLegendJack";
 const ADMIN_PASS = "BooBear24/7";
+let ADMIN_SECRET = '';
 
 function setRole(r){ try{ localStorage.setItem('role', r);}catch{} }
 function getRole(){ try{ return localStorage.getItem('role') || 'guest'; }catch{ return 'guest'; } }
@@ -22,30 +23,119 @@ function doLogin(e){
   if (u === ADMIN_USER && p === ADMIN_PASS) { setRole('staff'); location.href = '/'; }
   else alert('Invalid credentials');
 }
+
 function applyRoleUI(){
   const isStaff = getRole() === 'staff';
   safe(()=>$('#loginBtn').classList.toggle('hidden', isStaff));
   safe(()=>$('#logoutBtn').classList.toggle('hidden', !isStaff));
   safe(()=>$('#about-box').contentEditable = isStaff ? 'true' : 'false');
   safe(()=>$('#subs-controls').classList.toggle('hidden', !isStaff));
+  safe(()=>$('#admin-controls').classList.toggle('hidden', !isStaff));
+  
+  if (isStaff) {
+    loadSocialLinksForEdit();
+  }
 }
 
-/* ===== About ===== */
+/* ===== Global About Me ===== */
+async function loadAbout(){
+  try {
+    const r = await fetch('/api/about');
+    const data = await r.json();
+    if (data.html) $('#about-box').innerHTML = data.html;
+  } catch {
+    $('#about-box').innerHTML = '<p>Welcome to my stream!</p>';
+  }
+}
+
 function toggleAboutEdit(enable=true){
   safe(()=>{ $('#about-box').contentEditable = enable ? 'true' : 'false'; });
   safe(()=>{ $('#about-save-row').classList.toggle('hidden', !enable); });
 }
+
 function saveAbout(){
   const html = $('#about-box')?.innerHTML || '';
-  try{ localStorage.setItem('about_html', html); }catch{}
-  toggleAboutEdit(false);
-  alert('About saved');
+  
+  fetch('/api/about', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${ADMIN_SECRET}`
+    },
+    body: JSON.stringify({ html })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      toggleAboutEdit(false);
+      alert('About saved globally');
+    } else {
+      alert('Failed to save');
+    }
+  })
+  .catch(() => alert('Error saving'));
 }
-function loadAbout(){
-  try{
-    const html = localStorage.getItem('about_html');
-    if (html) $('#about-box').innerHTML = html;
-  }catch{}
+
+/* ===== Social Links Management ===== */
+async function loadSocialLinks(){
+  try {
+    const r = await fetch('/api/social-links');
+    const links = await r.json();
+    
+    // Update social link hrefs
+    document.querySelectorAll('.social').forEach(link => {
+      const platform = link.getAttribute('aria-label')?.toLowerCase();
+      if (platform && links[platform]) {
+        link.href = links[platform];
+        link.id = `social-${platform}`;
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to load social links:', e);
+  }
+}
+
+async function loadSocialLinksForEdit(){
+  try {
+    const r = await fetch('/api/social-links');
+    const links = await r.json();
+    
+    // Populate edit fields
+    $('#social-twitch-url').value = links.twitch || '';
+    $('#social-tiktok-url').value = links.tiktok || '';
+    $('#social-kick-url').value = links.kick || '';
+    $('#social-onlyfans-url').value = links.onlyfans || '';
+  } catch (e) {
+    console.warn('Failed to load social links for edit:', e);
+  }
+}
+
+function updateSocialLinks(){
+  const updates = {
+    twitch: $('#social-twitch-url')?.value?.trim() || '',
+    tiktok: $('#social-tiktok-url')?.value?.trim() || '',
+    kick: $('#social-kick-url')?.value?.trim() || '',
+    onlyfans: $('#social-onlyfans-url')?.value?.trim() || ''
+  };
+  
+  fetch('/api/social-links', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${ADMIN_SECRET}`
+    },
+    body: JSON.stringify(updates)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert('Social links updated globally');
+      loadSocialLinks(); // Refresh display
+    } else {
+      alert('Failed to update social links');
+    }
+  })
+  .catch(() => alert('Error updating social links'));
 }
 
 /* ===== Subs (local) ===== */
@@ -64,11 +154,13 @@ function addOrUpdateSub(){
   lsSetSubs(list);
   renderSubs();
 }
+
 function resetSubs(){
   if (!confirm('Reset all gifted subs?')) return;
   try{ localStorage.removeItem(SUBS_KEY); }catch{}
   renderSubs();
 }
+
 function renderSubs(){
   const rows = lsGetSubs();
   const box = $('#subs-list');
@@ -106,6 +198,7 @@ function saveTwitchCreds(){
     alert('Saved.');
   }catch{ alert('Could not save.'); }
 }
+
 async function helix(path, params={}){
   const cid = localStorage.getItem('twitch_client_id') || '';
   const tok = localStorage.getItem('twitch_access_token') || '';
@@ -116,6 +209,7 @@ async function helix(path, params={}){
   if (!res.ok){ const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
   return res.json();
 }
+
 async function getUsersMap(userIds){
   if (!userIds.length) return new Map();
   const cid = localStorage.getItem('twitch_client_id') || '';
@@ -128,6 +222,7 @@ async function getUsersMap(userIds){
   const map = new Map(); for (const u of data) map.set(u.id, u);
   return map;
 }
+
 async function refreshBits(){
   const listEl = $('#bits-list'); if (!listEl) return;
   const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
@@ -158,14 +253,17 @@ async function apiGet(path){
   const r = await fetch(path, { credentials:'include' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json();
 }
+
 async function loadDiscordConfig(){
   try{
     const cfg = await apiGet('/api/config');
     DISCORD_USER_ID = cfg?.discord_user_id || '';
+    ADMIN_SECRET = cfg?.admin_secret || 'dev_secret_change_me';
     if (!DISCORD_USER_ID){ console.warn('No DISCORD_USER_ID set on server.'); return; }
     connectLanyard();
   }catch(e){ console.warn('Failed to load /api/config:', e.message); }
 }
+
 function connectLanyard(){
   if (!DISCORD_USER_ID) return;
   const ws = new WebSocket('wss://lanyard.cnrad.dev/socket');
@@ -185,45 +283,58 @@ function connectLanyard(){
   ws.addEventListener('close', () => setTimeout(connectLanyard, 3000));
 }
 
-/* ===== Spotify (OAuth via server) ===== */
-function connectSpotify(){ window.location.href = '/auth/spotify/login'; }
+/* ===== Global Spotify (your account) ===== */
 let spotifyTimer = null;
 async function updateSpotify(){
   const el = $('#spotify-track');
-  const connectBox = $('#spotify-connect');
   if (!el) return;
-  try{
-    const r = await fetch('/api/spotify/now-playing', { credentials:'include' });
-    if (r.status === 401){ el.textContent = 'Spotify: Not Connected'; connectBox?.classList.remove('hidden'); }
-    else if (r.ok){
+  
+  try {
+    const r = await fetch('/api/spotify/global-now-playing');
+    if (r.ok) {
       const data = await r.json();
-      if (!data || data.playing === false || !data.item){
+      if (!data || data.playing === false || !data.item) {
         el.textContent = 'Spotify: Not Playing';
+        el.title = 'Spotify: Not Playing';
+        el.classList.remove('scrolling');
       } else {
-        const name = data.item?.name;
+        const name = data.item?.name || 'Unknown';
         const artists = (data.item?.artists || []).map(a => a.name).join(', ');
-        el.textContent = `${name || 'Unknown'} — ${artists || ''}`;
+        const fullText = `${name} — ${artists}`;
+        
+        // Set text and title for tooltip
+        el.textContent = fullText;
+        el.title = fullText;
+        
+        // Auto-scroll if text is too long
+        if (fullText.length > 20) {
+          el.classList.add('scrolling');
+        } else {
+          el.classList.remove('scrolling');
+        }
       }
-      connectBox?.classList.add('hidden');
     } else {
-      el.textContent = 'Spotify: Not Connected';
-      connectBox?.classList.remove('hidden');
+      el.textContent = 'Spotify: Not Available';
+      el.title = 'Spotify: Not Available';
+      el.classList.remove('scrolling');
     }
-  }catch{
-    el.textContent = 'Spotify: Not Connected';
-    connectBox?.classList.remove('hidden');
+  } catch {
+    el.textContent = 'Spotify: Error';
+    el.title = 'Spotify: Error';
+    el.classList.remove('scrolling');
   }
+  
   clearTimeout(spotifyTimer);
-  spotifyTimer = setTimeout(updateSpotify, 15000);
+  spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
 /* ===== Boot ===== */
 window.addEventListener('DOMContentLoaded', () => {
-  // Robust nav: also bind programmatically in case inline onclicks are ignored
-  const map = { home:'home', about:'about', leaderboards:'leaderboards' };
+  // Robust nav
+  const map = { about:'about', leaderboards:'leaderboards' };
   document.querySelectorAll('.nav-center .nav-box').forEach(btn=>{
     btn.addEventListener('click', () => {
-      const id = [...btn.classList].find(c => map[c]); // home/about/leaderboards
+      const id = [...btn.classList].find(c => map[c]);
       showSection(map[id] || 'home');
     });
   });
@@ -231,6 +342,7 @@ window.addEventListener('DOMContentLoaded', () => {
   showSection('home');
   applyRoleUI();
   loadAbout();
+  loadSocialLinks();
   renderSubs();
 
   // Twitch embed
@@ -245,13 +357,13 @@ window.addEventListener('DOMContentLoaded', () => {
   loadDiscordConfig();
   updateSpotify();
 
-  // Prefill saved Twitch creds (optional)
+  // Prefill saved Twitch creds
   const idEl = $('#twitch_client_id');
   const tkEl = $('#twitch_access_token');
   if (idEl) idEl.value = localStorage.getItem('twitch_client_id') || '';
   if (tkEl) tkEl.value = localStorage.getItem('twitch_access_token') || '';
 
-  // Extra: Bind buttons safely (if inline blocked by CSP)
+  // Extra: Bind buttons safely
   $('#bits_refresh_btn')?.addEventListener('click', e => { e.preventDefault(); refreshBits(); });
   $('#subs_add_btn')?.addEventListener('click', e => { e.preventDefault(); addOrUpdateSub(); });
   $('#subs_reset_btn')?.addEventListener('click', e => { e.preventDefault(); resetSubs(); });
