@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ThatLegendJack</title>
+<style>
+  :root{ --ars-red:#EF0107; --ars-white:#FFF; --ars-navy:#063672; --ars-gold:#9C824A; }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:Arial,Helvetica,sans-serif; color:#fff; text-align:center;
+    background:linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
+  }
+  h1{
+    margin:1rem 0 0; font-size:2.8rem; font-weight:900; text-shadow:2px 2px 5px #000;
+    background:linear-gradient(270deg,#EF0107,#FFFFFF,#063672,#EF0107);
+    background-size:600% 600%;
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:gradientShift 8s ease infinite;
+  }
+  @keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+  .hidden{display:none}
+  section{padding:1rem}
+
+  /* Top-right auth buttons */
+  .login-container{position:fixed;top:10px;right:20px;background:rgba(0,0,0,.75);padding:10px;border-radius:10px;z-index:40}
+  .login-container button{padding:.6rem 1rem;background:var(--ars-red);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
+  .login-container button:hover{background:var(--ars-gold)}
+
+  /* Nav boxes */
+  .nav-center{margin:1rem auto 0;display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}
+  .nav-box{
+    display:block;min-width:150px;padding:.9rem 1.6rem;font-weight:800;color:#fff;text-decoration:none;border-radius:12px;
+    box-shadow:2px 2px 8px rgba(0,0,0,.6);cursor:pointer; transition:.15s; border:2px solid var(--ars-white)
+  }
+  .nav-box:hover{transform:translateY(-3px)}
+  .home{background:linear-gradient(135deg,var(--ars-gold),var(--ars-red))}
+  .about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
+  .leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
+
+  /* Unified surfaces */
+  .surface{
+    max-width:1100px;margin:1rem auto;padding:1.2rem 1.2rem 1.4rem;
+    border-radius:16px; text-align:left; border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 12px 28px rgba(0,0,0,.28);
+    background:rgba(0,0,0,.35); position:relative;
+  }
+  .surface-about{ background:linear-gradient(135deg, rgba(239,1,7,.85), rgba(156,130,74,.85)); }
+  .surface-leader{ background:linear-gradient(135deg, rgba(6,54,114,.85), rgba(255,255,255,.38)); }
+
+  /* Go back (About/Leaderboards) */
+  .back-btn{
+    position:fixed; top:10px; left:20px; z-index:35;
+    padding:.5rem .9rem; border:none; border-radius:10px; font-weight:800; cursor:pointer; color:#fff;
+    background:linear-gradient(135deg,var(--ars-red),var(--ars-gold)); box-shadow:0 6px 14px rgba(0,0,0,.3);
+  }
+
+  /* Twitch player */
+  .player-wrap{max-width:1000px;margin:1rem auto 0;padding:0 1rem}
+  .player-frame{position:relative;width:100%;aspect-ratio:16/9;background:#0e0e10;border:2px solid var(--ars-gold);
+    border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  #twitch-player{position:absolute;inset:0;width:100%;height:100%}
+  .offline-banner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;
+    background:rgba(0,0,0,.8);padding:1rem;opacity:0;visibility:hidden;transition:.25s}
+  .offline-show{opacity:1;visibility:visible}
+  .offline-btn{display:inline-block;padding:.55rem .9rem;border-radius:8px;background:linear-gradient(135deg,var(--ars-red),var(--ars-gold));
+    color:#fff;text-decoration:none;font-weight:800}
+
+  /* RIGHT status circles (flush to right) */
+  .status-container{
+    position:fixed; bottom:20px; right:0; z-index:30;
+    display:flex; gap:1.2rem; flex-wrap:wrap; align-items:flex-end; padding-right:10px;
+  }
+  .circle{
+    width:140px; height:140px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:.86rem; text-align:center; padding:10px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
+  }
+  .spotify{border-color:#1DB954} .discord{border-color:#5865F2}
+  .track{max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* LEFT social circles */
+  .social-stack{ position:fixed; left:20px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:16px; z-index:25; }
+  .social{
+    width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:#0f0f12; border:3px solid rgba(255,255,255,.6); box-shadow:0 6px 14px rgba(0,0,0,.35);
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; overflow:hidden; text-decoration:none;
+  }
+  .social:hover{ transform:translateY(-3px); box-shadow:0 8px 18px rgba(0,0,0,.45); border-color:#fff; }
+  .social svg{ width:56%; height:56%; display:block; }
+
+  /* Internals */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  .card{ border-radius:12px; padding:1rem; background:transparent; border:1px solid rgba(255,255,255,.25); box-shadow:0 4px 14px rgba(0,0,0,.2) }
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:.45rem .6rem;text-align:left;border-bottom:1px solid rgba(255,255,255,.15)}
+  .row{display:flex;gap:.5rem;margin:.45rem 0}
+  .row input,.row select,.row button{padding:.5rem;border:none;border-radius:8px}
+  .row input,.row select{flex:1}
+  .row button{background:var(--ars-red);color:#fff;font-weight:700;cursor:pointer}
+
+  /* form styles reused on login.html */
+  form{max-width:420px;margin:1rem auto;background:rgba(0,0,0,.35);padding:1rem;border-radius:12px}
+  form input{display:block;width:100%;margin:.5rem 0;padding:.6rem;border:none;border-radius:8px}
+  form button{padding:.6rem 1rem;border:none;border-radius:8px;background:var(--ars-red);color:#fff;font-weight:800;cursor:pointer}
+  form button:hover{background:var(--ars-gold)}
+
+  .spotify-btn{padding:.7rem 1.1rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#1DB954,#15803d)}
+</style>
+</head>
+<body>
+  <h1>ThatLegendJack</h1>
+
+  <!-- Top-right Login/Logout -->
+  <div class="login-container">
+    <button id="loginBtn" onclick="location.href='/login.html'">Login</button>
+    <button id="logoutBtn" class="hidden" onclick="doLogout()">Logout</button>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav-center">
+    <div class="nav-box home" role="button" onclick="showSection('home')">Home</div>
+    <div class="nav-box about" role="button" onclick="showSection('about')">About Me</div>
+    <div class="nav-box leaderboards" role="button" onclick="showSection('leaderboards')">Leaderboards</div>
+  </div>
+
+  <!-- LEFT SOCIAL CIRCLES -->
+  <div class="social-stack" aria-label="Social links">
+    <!-- Twitch -->
+    <a class="social" href="https://www.twitch.tv/ThatLegendJackk" target="_blank" aria-label="Twitch">
+      <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#9146FF"/><path d="M60 50h120v82l-38 38h-36l-16 16H72v-20H60V50zm24 24v74h20v20h20l20-20h24V74H84zm64 56V86h-16v44h16zm-36 0V86h-16v44h16z" fill="#fff"/></svg>
+    </a>
+    <!-- TikTok -->
+    <a class="social" href="https://www.tiktok.com/@thatlegendjack" target="_blank" aria-label="TikTok">
+      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#000"/><path d="M170 56c10 13 23 22 38 24v28c-15-1-29-6-40-14v60c0 35-28 64-64 64s-64-29-64-64 29-64 64-64h6v28h-6c-20 0-36 16-36 36s16 36 36 36 36-16 36-36V56h30z" fill="#25F4EE"/><path d="M168 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
+    </a>
+    <!-- Kick -->
+    <a class="social" href="https://kick.com/ThatLegendJackk" target="_blank" aria-label="Kick">
+      <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#52FF00"/><path d="M60 60h40v50l40-50h40l-50 60 50 60h-40l-40-50v50H60V60z" fill="#0d0d0d"/></svg>
+    </a>
+    <!-- OnlyFans -->
+    <a class="social" href="https://onlyfans.com/your-handle" target="_blank" aria-label="OnlyFans">
+      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#00AFF0"/><path d="M128 76c-29 0-52 23-52 52s23 52 52 52 52-23 52-52-23-52-52-52zm0 24a28 28 0 110 56 28 28 0 010-56z" fill="#fff"/><path d="M206 88h-30l-10 32h16l-8 48h24l12-80h-4z" fill="#fff"/></svg>
+    </a>
+  </div>
+
+  <!-- HOME -->
+  <section id="home">
+    <div class="player-wrap">
+      <div class="player-frame">
+        <div id="twitch-player"></div>
+        <div id="twitch-offline" class="offline-banner">
+          <div><strong>ThatLegendJackk is currently offline.</strong></div>
+          <a class="offline-btn" href="https://www.twitch.tv/ThatLegendJackk" target="_blank">Go to Twitch</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right-bottom status circles -->
+    <div class="status-container">
+      <div class="circle spotify" id="spotify-circle"><span class="track" id="spotify-track">Spotify: Not Connected</span></div>
+      <div class="circle discord" id="discord-circle"><span id="discord-status">Discord: Offline</span></div>
+    </div>
+
+    <!-- Spotify connect (disappears after connected) -->
+    <div id="spotify-connect" class="surface" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
+      <button onclick="connectSpotify()" class="spotify-btn">Connect Spotify (OAuth)</button>
+      <p style="opacity:.9;margin:.5rem 0 0 0">After connecting, this button disappears and the circle updates automatically.</p>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about" class="hidden">
+    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <div class="surface surface-about">
+      <h2>About Me</h2>
+      <div id="about-box" contenteditable="false">This is your About Me section.</div>
+      <div id="about-save-row" class="row hidden" style="margin-top:.6rem">
+        <button onclick="saveAbout()">Save About</button>
+        <button style="background:#444" onclick="toggleAboutEdit(false)">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEADERBOARDS -->
+  <section id="leaderboards" class="hidden">
+    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <div class="surface surface-leader">
+      <h2>Leaderboards</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Bits Leaderboard</h3>
+          <div class="row" style="align-items:center">
+            <label>Period:</label>
+            <select id="bits_period" style="max-width:160px">
+              <option value="all" selected>all</option>
+              <option value="day">day</option>
+              <option value="week">week</option>
+              <option value="month">month</option>
+              <option value="year">year</option>
+            </select>
+            <label>Count:</label>
+            <input id="bits_count" type="number" min="1" max="10" value="10" style="max-width:100px"/>
+            <button id="bits_refresh_btn" onclick="refreshBits()">Refresh</button>
+          </div>
+          <div id="bits-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No data yet.</div>
+        </div>
+
+        <div class="card">
+          <h3>Gifted Subs (All Time)</h3>
+          <div id="subs-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No subs yet.</div>
+          <div id="subs-controls" class="hidden" style="margin-top:.6rem">
+            <div class="row">
+              <input id="sub_user" placeholder="Username"/>
+              <input id="sub_gifts" type="number" min="0" placeholder="Gifted count"/>
+              <button id="subs_add_btn" onclick="addOrUpdateSub()">Add/Update</button>
+            </div>
+            <div class="row">
+              <button id="subs_reset_btn" style="background:#444" onclick="resetSubs()">Reset Subs List</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <details style="margin-top:1rem">
+        <summary style="cursor:pointer;font-weight:800">Twitch API credentials for Bits</summary>
+        <p style="margin:.25rem 0 .6rem 0">Use a <strong>User access token</strong> with <code>bits:read</code> scope.</p>
+        <div class="row">
+          <input id="twitch_client_id" placeholder="Client ID (paste here)"/>
+          <input id="twitch_access_token" placeholder="Access Token (bits:read)"/>
+          <button id="twitch_save_btn" onclick="saveTwitchCreds()">Save</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <script src="https://embed.twitch.tv/embed/v1.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
