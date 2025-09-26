@@ -7,7 +7,11 @@ function showSection(id){
   if (target){ 
     target.classList.remove('hidden'); 
     window.scrollTo({top:0,behavior:'smooth'}); 
-    safe(() => $('.back-btn').style.display = id === 'home' ? 'none' : 'block');
+    // Hide back button on home page
+    safe(() => {
+      const backBtn = $('.back-btn');
+      if (backBtn) backBtn.style.display = id === 'home' ? 'none' : 'block';
+    });
   }
 }
 
@@ -373,18 +377,37 @@ async function checkSpotifyStatus(){
   } catch (e) {}
 }
 
-/* ===== Boot ===== */
-window.addEventListener('DOMContentLoaded', () => {
-  // Nav
-  const map = { home:'home', about:'about', leaderboards:'leaderboards' };
-  document.querySelectorAll('.nav-center .nav-box').forEach(btn=>{
-    btn.addEventListener('click', () => {
-      const id = [...btn.classList].find(c => map[c]);
-      showSection(map[id] || 'home');
-    });
+/* ===== Navigation ===== */
+function setupNavigation() {
+  // Remove home button functionality from nav boxes
+  const navBoxes = document.querySelectorAll('.nav-center .nav-box');
+  navBoxes.forEach(box => {
+    box.onclick = function() {
+      const id = this.getAttribute('data-section');
+      if (id) {
+        showSection(id);
+      }
+    };
   });
 
+  // Back button
+  const backBtn = $('.back-btn');
+  if (backBtn) {
+    backBtn.onclick = function() {
+      showSection('home');
+    };
+  }
+}
+
+/* ===== Boot ===== */
+window.addEventListener('DOMContentLoaded', () => {
+  // Setup navigation
+  setupNavigation();
+  
+  // Start with home section
   showSection('home');
+  
+  // Load data
   checkAuth();
   loadAbout();
   loadSubs();
@@ -397,7 +420,9 @@ window.addEventListener('DOMContentLoaded', () => {
     twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
     twitchScript.onload = () => initTwitch();
     document.head.appendChild(twitchScript);
-  } else { initTwitch(); }
+  } else { 
+    initTwitch(); 
+  }
 
   // Discord + Spotify
   loadDiscordConfig();
@@ -415,4 +440,10 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#subs_reset_btn')?.addEventListener('click', e => { e.preventDefault(); resetSubs(); });
   $('#twitch_save_btn')?.addEventListener('click', e => { e.preventDefault(); saveTwitchCreds(); });
   $('#save_urls_btn')?.addEventListener('click', e => { e.preventDefault(); saveSocialUrls(); });
+  
+  // Spotify connect button
+  const spotifyConnectBtn = document.querySelector('.spotify-btn');
+  if (spotifyConnectBtn) {
+    spotifyConnectBtn.onclick = connectSpotify;
+  }
 });
