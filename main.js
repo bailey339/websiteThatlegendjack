@@ -300,14 +300,15 @@ async function updateSpotify(){
       } else {
         const name = data.item?.name || 'Unknown';
         const artists = (data.item?.artists || []).map(a => a.name).join(', ');
-        const fullText = `${name} — ${artists}`;
+        const fullText = `🎵 ${name} - ${artists}`;
         
         // Set text and title for tooltip
         el.textContent = fullText;
         el.title = fullText;
         
-        // Auto-scroll if text is too long
-        if (fullText.length > 20) {
+        // Auto-scroll if text is too long for the circle
+        // The circle is about 160px wide, which fits ~25-30 characters comfortably
+        if (fullText.length > 25) {
           el.classList.add('scrolling');
         } else {
           el.classList.remove('scrolling');
@@ -328,6 +329,16 @@ async function updateSpotify(){
   spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
+/* ===== Social Links Initialization ===== */
+function initSocialLinks() {
+  loadSocialLinks();
+  
+  // Pre-populate admin fields if admin is logged in
+  if (getRole() === 'staff') {
+    loadSocialLinksForEdit();
+  }
+}
+
 /* ===== Boot ===== */
 window.addEventListener('DOMContentLoaded', () => {
   // Robust nav
@@ -342,7 +353,7 @@ window.addEventListener('DOMContentLoaded', () => {
   showSection('home');
   applyRoleUI();
   loadAbout();
-  loadSocialLinks();
+  initSocialLinks(); // Use the new initialization function
   renderSubs();
 
   // Twitch embed
