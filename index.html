@@ -118,9 +118,9 @@
 
   <!-- NAV -->
   <div class="nav-center">
-    <div class="nav-box home" role="button" onclick="showSection('home')">Home</div>
-    <div class="nav-box about" role="button" onclick="showSection('about')">About Me</div>
-    <div class="nav-box leaderboards" role="button" onclick="showSection('leaderboards')">Leaderboards</div>
+    <div class="nav-box home" data-section="home">Home</div>
+    <div class="nav-box about" data-section="about">About Me</div>
+    <div class="nav-box leaderboards" data-section="leaderboards">Leaderboards</div>
   </div>
 
   <!-- LEFT SOCIAL CIRCLES -->
@@ -163,14 +163,14 @@
 
     <!-- Spotify connect (disappears after connected) -->
     <div id="spotify-connect" class="surface" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
-      <button onclick="connectSpotify()" class="spotify-btn">Connect Spotify (OAuth)</button>
+      <button class="spotify-btn">Connect Spotify (OAuth)</button>
       <p style="opacity:.9;margin:.5rem 0 0 0">After connecting, this button disappears and the circle updates automatically.</p>
     </div>
   </section>
 
   <!-- ABOUT -->
   <section id="about" class="hidden">
-    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <button class="back-btn">Go back</button>
     <div class="surface surface-about">
       <h2>About Me</h2>
       <div id="about-box" contenteditable="false">This is your About Me section.</div>
@@ -200,7 +200,7 @@
             <input id="onlyfans_url" type="url" placeholder="https://onlyfans.com/username" style="flex:1"/>
           </div>
           <div class="row">
-            <button id="save_urls_btn" onclick="saveSocialUrls()">Save URLs</button>
+            <button id="save_urls_btn">Save URLs</button>
           </div>
         </div>
       </div>
@@ -209,7 +209,7 @@
 
   <!-- LEADERBOARDS -->
   <section id="leaderboards" class="hidden">
-    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <button class="back-btn">Go back</button>
     <div class="surface surface-leader">
       <h2>Leaderboards</h2>
       <div class="grid">
@@ -226,7 +226,7 @@
             </select>
             <label>Count:</label>
             <input id="bits_count" type="number" min="1" max="10" value="10" style="max-width:100px"/>
-            <button id="bits_refresh_btn" onclick="refreshBits()">Refresh</button>
+            <button id="bits_refresh_btn">Refresh</button>
           </div>
           <div id="bits-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No data yet.</div>
         </div>
@@ -238,10 +238,10 @@
             <div class="row">
               <input id="sub_user" placeholder="Username"/>
               <input id="sub_gifts" type="number" min="0" placeholder="Gifted count"/>
-              <button id="subs_add_btn" onclick="addOrUpdateSub()">Add/Update</button>
+              <button id="subs_add_btn">Add/Update</button>
             </div>
             <div class="row">
-              <button id="subs_reset_btn" style="background:#444" onclick="resetSubs()">Reset Subs List</button>
+              <button id="subs_reset_btn" style="background:#444">Reset Subs List</button>
             </div>
           </div>
         </div>
@@ -253,7 +253,7 @@
         <div class="row">
           <input id="twitch_client_id" placeholder="Client ID (paste here)"/>
           <input id="twitch_access_token" placeholder="Access Token (bits:read)"/>
-          <button id="twitch_save_btn" onclick="saveTwitchCreds()">Save</button>
+          <button id="twitch_save_btn">Save</button>
         </div>
       </details>
     </div>
