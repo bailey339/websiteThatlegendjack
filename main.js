@@ -283,31 +283,33 @@ function connectLanyard(){
   ws.addEventListener('close', () => setTimeout(connectLanyard, 3000));
 }
 
-/* ===== Global Spotify (your account) ===== */
+/* ===== Spotify Live Status ===== */
 let spotifyTimer = null;
 async function updateSpotify(){
   const el = $('#spotify-track');
   if (!el) return;
   
   try {
-    const r = await fetch('/api/spotify/global-now-playing');
+    const r = await fetch('/api/spotify/now-playing');
+    
+    if (r.status === 401) {
+      el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
+      return;
+    }
+    
     if (r.ok) {
       const data = await r.json();
-      if (!data || data.playing === false || !data.item) {
-        el.textContent = 'Spotify: Not Playing';
-        el.title = 'Spotify: Not Playing';
-        el.classList.remove('scrolling');
+      
+      if (data.error === 'not_connected' || !data || data.playing === false || !data.item) {
+        el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
       } else {
         const name = data.item?.name || 'Unknown';
         const artists = (data.item?.artists || []).map(a => a.name).join(', ');
         const fullText = `🎵 ${name} - ${artists}`;
         
-        // Set text and title for tooltip
         el.textContent = fullText;
         el.title = fullText;
         
-        // Auto-scroll if text is too long for the circle
-        // The circle is about 160px wide, which fits ~25-30 characters comfortably
         if (fullText.length > 25) {
           el.classList.add('scrolling');
         } else {
@@ -315,25 +317,24 @@ async function updateSpotify(){
         }
       }
     } else {
-      el.textContent = 'Spotify: Not Available';
-      el.title = 'Spotify: Not Available';
-      el.classList.remove('scrolling');
+      el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
     }
-  } catch {
-    el.textContent = 'Spotify: Error';
-    el.title = 'Spotify: Error';
-    el.classList.remove('scrolling');
+  } catch (error) {
+    el.innerHTML = '<button class="spotify-btn" onclick="connectSpotify()">Connect Spotify</button>';
   }
   
   clearTimeout(spotifyTimer);
   spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
+function connectSpotify() {
+  window.location.href = '/auth/spotify/login';
+}
+
 /* ===== Social Links Initialization ===== */
 function initSocialLinks() {
   loadSocialLinks();
   
-  // Pre-populate admin fields if admin is logged in
   if (getRole() === 'staff') {
     loadSocialLinksForEdit();
   }
@@ -353,7 +354,7 @@ window.addEventListener('DOMContentLoaded', () => {
   showSection('home');
   applyRoleUI();
   loadAbout();
-  initSocialLinks(); // Use the new initialization function
+  initSocialLinks();
   renderSubs();
 
   // Twitch embed
