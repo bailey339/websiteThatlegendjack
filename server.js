@@ -10,19 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
-// CRITICAL FIX: Trust Render's proxy
 app.set('trust proxy', 1);
-
 app.use(express.json());
 
-// FIXED Cookie session configuration
+// Cookie session (used for Spotify OAuth tokens)
 app.use(cookieSession({
   name: 'tlj_sess',
   keys: [process.env.SESSION_SECRET || 'dev_change_me'],
   httpOnly: true,
   sameSite: 'lax',
-  secure: false, // ← CHANGED TO FALSE to work on Render
+  secure: false,
   maxAge: 30 * 24 * 60 * 60 * 1000
 }));
 
@@ -69,7 +66,7 @@ app.get('/login.html', (req, res) => {
 /* ---------- Spotify OAuth ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3000/auth/spotify/callback';
+const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3000/auth/spotify/callback').trim();
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -81,9 +78,9 @@ function authUrl(state) {
   const q = new URLSearchParams({
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
-    scope,
+    scope: scope,
     redirect_uri: SPOTIFY_REDIRECT_URI,
-    state,
+    state: state,
     show_dialog: 'false'
   });
   return `${SPOTIFY_AUTH_URL}?${q}`;
@@ -93,6 +90,11 @@ app.get('/auth/spotify/login', (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(500).send('Spotify env missing');
   const state = Math.random().toString(36).slice(2);
   req.session.spotify_state = state;
+  
+  // Debug log to see the actual URL being generated
+  console.log('Spotify Auth URL:', authUrl(state));
+  console.log('Redirect URI being used:', SPOTIFY_REDIRECT_URI);
+  
   res.redirect(authUrl(state));
 });
 
@@ -163,6 +165,17 @@ app.get('/api/spotify/now-playing', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+/* ---------- Debug endpoint to check Spotify config ---------- */
+app.get('/debug/spotify', (req, res) => {
+  res.json({
+    client_id_set: !!SPOTIFY_CLIENT_ID,
+    client_secret_set: !!SPOTIFY_CLIENT_SECRET,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    redirect_uri_encoded: encodeURIComponent(SPOTIFY_REDIRECT_URI),
+    redirect_uri_length: SPOTIFY_REDIRECT_URI.length
+  });
 });
 
 /* ---------- SPA fallback ---------- */
