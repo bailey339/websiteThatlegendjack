@@ -79,10 +79,11 @@ app.post('/api/social-links', express.json(), (req, res) => {
   res.json({ success: true });
 });
 
-/* ---------- Spotify OAuth (FIXED FOR RENDER) ---------- */
+/* ---------- Spotify OAuth (FIXED REDIRECT URI) ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback';
+// FIX: Trim any whitespace/line breaks from the redirect URI
+const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback').trim();
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -94,7 +95,7 @@ function authUrl(state) {
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
     scope: scope,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
+    redirect_uri: SPOTIFY_REDIRECT_URI, // FIXED: No extra spaces
     state: state,
     show_dialog: 'false'
   });
@@ -120,7 +121,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code: code.toString(),
-      redirect_uri: SPOTIFY_REDIRECT_URI
+      redirect_uri: SPOTIFY_REDIRECT_URI // FIXED: Consistent URI
     });
     
     const response = await fetch(SPOTIFY_TOKEN_URL, {
@@ -202,12 +203,13 @@ app.get('/api/spotify/now-playing', async (req, res) => {
   }
 });
 
-// Simple test endpoint
-app.get('/api/spotify/test', (req, res) => {
-  res.json({ 
-    message: 'Spotify endpoint working',
-    has_creds: !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET),
-    redirect_uri: SPOTIFY_REDIRECT_URI
+// Debug endpoint to check redirect URI
+app.get('/api/spotify/debug', (req, res) => {
+  res.json({
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    encoded_uri: encodeURIComponent(SPOTIFY_REDIRECT_URI),
+    has_client_id: !!SPOTIFY_CLIENT_ID,
+    has_client_secret: !!SPOTIFY_CLIENT_SECRET
   });
 });
 
