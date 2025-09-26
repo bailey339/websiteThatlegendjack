@@ -13,7 +13,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// Cookie session (used for Spotify OAuth tokens)
+// Cookie session (used for admin auth)
 app.use(cookieSession({
   name: 'tlj_sess',
   keys: [process.env.SESSION_SECRET || 'dev_change_me'],
@@ -31,10 +31,77 @@ app.use(express.static(__dirname, { extensions: ['html'] }));
 
 /* ---------- ENV to client (Discord ID only) ---------- */
 app.get('/api/config', (req, res) => {
-  res.json({ discord_user_id: process.env.DISCORD_USER_ID || null });
+  res.json({ 
+    discord_user_id: process.env.DISCORD_USER_ID || null,
+    admin_secret: process.env.ADMIN_SECRET || 'dev_secret_change_me'
+  });
 });
 
-/* ---------- Minimal login page (no extra file) ---------- */
+/* ---------- Global About Me (admin editable, everyone sees) ---------- */
+let globalAboutHTML = process.env.DEFAULT_ABOUT_HTML || '<p>Welcome to my stream! This is the About Me section.</p>';
+
+app.get('/api/about', (req, res) => {
+  res.json({ html: globalAboutHTML });
+});
+
+app.post('/api/about', express.json(), (req, res) => {
+  // Simple admin check
+  const auth = req.headers.authorization;
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET || 'dev_secret_change_me'}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  globalAboutHTML = req.body.html || globalAboutHTML;
+  res.json({ success: true });
+});
+
+/* ---------- Social Links (admin configurable) ---------- */
+const defaultSocialLinks = {
+  twitch: 'https://www.twitch.tv/ThatLegendJackk',
+  tiktok: 'https://www.tiktok.com/@thatlegendjack', 
+  kick: 'https://kick.com/ThatLegendJackk',
+  onlyfans: 'https://onlyfans.com/your-handle'
+};
+
+let socialLinks = { ...defaultSocialLinks };
+
+app.get('/api/social-links', (req, res) => {
+  res.json(socialLinks);
+});
+
+app.post('/api/social-links', express.json(), (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth !== `Bearer ${process.env.ADMIN_SECRET || 'dev_secret_change_me'}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  socialLinks = { ...socialLinks, ...req.body };
+  res.json({ success: true });
+});
+
+/* ---------- Global Spotify (your account) ---------- */
+const YOUR_SPOTIFY_ACCESS_TOKEN = process.env.YOUR_SPOTIFY_ACCESS_TOKEN || '';
+
+app.get('/api/spotify/global-now-playing', async (req, res) => {
+  try {
+    if (!YOUR_SPOTIFY_ACCESS_TOKEN) {
+      return res.status(501).json({ error: 'Spotify not configured' });
+    }
+    
+    const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: { Authorization: `Bearer ${YOUR_SPOTIFY_ACCESS_TOKEN}` }
+    });
+    
+    if (r.status === 204) return res.json({ playing: false });
+    if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
+    
+    res.json(await r.json());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/* ---------- Minimal login page ---------- */
 app.get('/login.html', (req, res) => {
   res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
@@ -63,7 +130,7 @@ app.get('/login.html', (req, res) => {
 </html>`);
 });
 
-/* ---------- Spotify OAuth ---------- */
+/* ---------- Spotify OAuth (keep for backward compatibility) ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
 const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3000/auth/spotify/callback').trim();
@@ -90,11 +157,6 @@ app.get('/auth/spotify/login', (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(500).send('Spotify env missing');
   const state = Math.random().toString(36).slice(2);
   req.session.spotify_state = state;
-  
-  // Debug log to see the actual URL being generated
-  console.log('Spotify Auth URL:', authUrl(state));
-  console.log('Redirect URI being used:', SPOTIFY_REDIRECT_URI);
-  
   res.redirect(authUrl(state));
 });
 
@@ -165,17 +227,6 @@ app.get('/api/spotify/now-playing', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-});
-
-/* ---------- Debug endpoint to check Spotify config ---------- */
-app.get('/debug/spotify', (req, res) => {
-  res.json({
-    client_id_set: !!SPOTIFY_CLIENT_ID,
-    client_secret_set: !!SPOTIFY_CLIENT_SECRET,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    redirect_uri_encoded: encodeURIComponent(SPOTIFY_REDIRECT_URI),
-    redirect_uri_length: SPOTIFY_REDIRECT_URI.length
-  });
 });
 
 /* ---------- SPA fallback ---------- */
