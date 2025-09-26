@@ -1,19 +1,74 @@
-// server.js — Express web service (+ Spotify OAuth, Discord config) — ESM
+// server.js — Express web service with SQLite database
 try { (await import('dotenv')).config(); } catch (_) {}
 
 import path from 'node:path';
 import express from 'express';
 import cookieSession from 'cookie-session';
 import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize SQLite database
+const db = new Database(path.join(__dirname, 'site.db'));
+
+// Initialize database tables if they don't exist
+function initDatabase() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spotify_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS social_urls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT UNIQUE NOT NULL,
+      url TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS about_content (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS gifted_subs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      gifts INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Insert default social URLs if empty
+  const socialCount = db.prepare('SELECT COUNT(*) as count FROM social_urls').get();
+  if (socialCount.count === 0) {
+    const insertSocial = db.prepare('INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)');
+    insertSocial.run('twitch', 'https://www.twitch.tv/ThatLegendJackk');
+    insertSocial.run('tiktok', 'https://www.tiktok.com/@thatlegendjack');
+    insertSocial.run('kick', 'https://kick.com/ThatLegendJackk');
+    insertSocial.run('onlyfans', 'https://onlyfans.com/your-handle');
+  }
+
+  // Insert default about content if empty
+  const aboutCount = db.prepare('SELECT COUNT(*) as count FROM about_content').get();
+  if (aboutCount.count === 0) {
+    db.prepare('INSERT INTO about_content (content) VALUES (?)').run('This is your About Me section.');
+  }
+}
+
+initDatabase();
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// Cookie session (used for Spotify OAuth tokens)
+// Cookie session
 app.use(cookieSession({
   name: 'tlj_sess',
   keys: [process.env.SESSION_SECRET || 'dev_change_me'],
@@ -29,12 +84,122 @@ app.get('/healthz', (_, res) => res.status(200).send('ok'));
 /* ---------- Static files ---------- */
 app.use(express.static(__dirname, { extensions: ['html'] }));
 
-/* ---------- ENV to client (Discord ID only) ---------- */
+/* ---------- ENV to client ---------- */
 app.get('/api/config', (req, res) => {
   res.json({ discord_user_id: process.env.DISCORD_USER_ID || null });
 });
 
-/* ---------- Minimal login page (no extra file) ---------- */
+/* ---------- Auth API ---------- */
+function getRole(req) {
+  return req.session.role || 'guest';
+}
+
+app.post('/api/login', express.json(), (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'ThatLegendJack' && password === 'BooBear24/7') {
+    req.session.role = 'staff';
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session = null;
+  res.json({ success: true });
+});
+
+app.get('/api/auth/status', (req, res) => {
+  res.json({ role: getRole(req) });
+});
+
+/* ---------- Social URLs API ---------- */
+app.get('/api/social-urls', (req, res) => {
+  try {
+    const urls = db.prepare('SELECT platform, url FROM social_urls').all();
+    const urlMap = {};
+    urls.forEach(row => { urlMap[row.platform] = row.url; });
+    res.json(urlMap);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load social URLs' });
+  }
+});
+
+app.post('/api/social-urls', express.json(), (req, res) => {
+  if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
+  
+  try {
+    const stmt = db.prepare('INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)');
+    Object.entries(req.body).forEach(([platform, url]) => {
+      if (url) stmt.run(platform, url);
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save social URLs' });
+  }
+});
+
+/* ---------- About Content API ---------- */
+app.get('/api/about', (req, res) => {
+  try {
+    const row = db.prepare('SELECT content FROM about_content ORDER BY id DESC LIMIT 1').get();
+    res.json({ content: row?.content || 'This is your About Me section.' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load about content' });
+  }
+});
+
+app.post('/api/about', express.json(), (req, res) => {
+  if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
+  
+  try {
+    db.prepare('INSERT INTO about_content (content) VALUES (?)').run(req.body.content);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save about content' });
+  }
+});
+
+/* ---------- Gifted Subs API ---------- */
+app.get('/api/subs', (req, res) => {
+  try {
+    const subs = db.prepare('SELECT username, gifts FROM gifted_subs ORDER BY gifts DESC').all();
+    res.json(subs);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load subs' });
+  }
+});
+
+app.post('/api/subs', express.json(), (req, res) => {
+  if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
+  
+  try {
+    const { username, gifts } = req.body;
+    const existing = db.prepare('SELECT id FROM gifted_subs WHERE username = ?').get(username);
+    
+    if (existing) {
+      db.prepare('UPDATE gifted_subs SET gifts = ? WHERE username = ?').run(gifts, username);
+    } else {
+      db.prepare('INSERT INTO gifted_subs (username, gifts) VALUES (?, ?)').run(username, gifts);
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save sub' });
+  }
+});
+
+app.delete('/api/subs', (req, res) => {
+  if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
+  
+  try {
+    db.prepare('DELETE FROM gifted_subs').run();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to reset subs' });
+  }
+});
+
+/* ---------- Login Page ---------- */
 app.get('/login.html', (req, res) => {
   res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
@@ -78,9 +243,9 @@ function authUrl(state) {
   const q = new URLSearchParams({
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
-    scope: scope,
+    scope,
     redirect_uri: SPOTIFY_REDIRECT_URI,
-    state: state,
+    state,
     show_dialog: 'false'
   });
   return `${SPOTIFY_AUTH_URL}?${q}`;
@@ -90,11 +255,6 @@ app.get('/auth/spotify/login', (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return res.status(500).send('Spotify env missing');
   const state = Math.random().toString(36).slice(2);
   req.session.spotify_state = state;
-  
-  // Debug log to see the actual URL being generated
-  console.log('Spotify Auth URL:', authUrl(state));
-  console.log('Redirect URI being used:', SPOTIFY_REDIRECT_URI);
-  
   res.redirect(authUrl(state));
 });
 
@@ -117,65 +277,82 @@ app.get('/auth/spotify/callback', async (req, res) => {
     });
     if (!r.ok) return res.status(500).send('Token exchange failed: ' + await r.text());
     const j = await r.json();
-    req.session.spotify = {
-      access_token: j.access_token,
-      refresh_token: j.refresh_token,
-      expires_at: Date.now() + (j.expires_in || 3600) * 1000
-    };
+    
+    // Save to database
+    db.prepare(`
+      INSERT OR REPLACE INTO spotify_data (id, access_token, refresh_token, expires_at) 
+      VALUES (1, ?, ?, ?)
+    `).run(j.access_token, j.refresh_token, Date.now() + (j.expires_in || 3600) * 1000);
+    
     res.redirect('/');
   } catch (e) {
     res.status(500).send('OAuth error: ' + e.message);
   }
 });
 
-async function ensureSpotifyAccessToken(sess) {
-  if (!sess?.spotify?.refresh_token) return null;
-  if (sess.spotify.access_token && Date.now() < (sess.spotify.expires_at || 0)) return sess.spotify.access_token;
+async function ensureSpotifyAccessToken() {
+  try {
+    const row = db.prepare('SELECT * FROM spotify_data WHERE id = 1').get();
+    if (!row || !row.refresh_token) return null;
+    
+    if (row.access_token && Date.now() < (row.expires_at || 0)) {
+      return row.access_token;
+    }
 
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: sess.spotify.refresh_token
-  });
-  const r = await fetch(SPOTIFY_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${b64(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body
-  });
-  if (!r.ok) { sess.spotify = null; return null; }
-  const j = await r.json();
-  sess.spotify = {
-    access_token: j.access_token,
-    refresh_token: sess.spotify.refresh_token,
-    expires_at: Date.now() + (j.expires_in || 3600) * 1000
-  };
-  return sess.spotify.access_token;
+    // Refresh token
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: row.refresh_token
+    });
+    const r = await fetch(SPOTIFY_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${b64(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body
+    });
+    if (!r.ok) {
+      db.prepare('DELETE FROM spotify_data WHERE id = 1').run();
+      return null;
+    }
+    const j = await r.json();
+    db.prepare(`
+      UPDATE spotify_data SET access_token = ?, expires_at = ? WHERE id = 1
+    `).run(j.access_token, Date.now() + (j.expires_in || 3600) * 1000);
+    
+    return j.access_token;
+  } catch (e) {
+    return null;
+  }
 }
 
 app.get('/api/spotify/now-playing', async (req, res) => {
   try {
-    const at = await ensureSpotifyAccessToken(req.session);
+    const at = await ensureSpotifyAccessToken();
     if (!at) return res.status(401).json({ error: 'not_connected' });
+    
     const r = await fetch(NOW_PLAYING_URL, { headers: { Authorization: `Bearer ${at}` } });
     if (r.status === 204) return res.json({ playing: false });
     if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
-    res.json(await r.json());
+    
+    const data = await r.json();
+    res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-/* ---------- Debug endpoint to check Spotify config ---------- */
-app.get('/debug/spotify', (req, res) => {
-  res.json({
-    client_id_set: !!SPOTIFY_CLIENT_ID,
-    client_secret_set: !!SPOTIFY_CLIENT_SECRET,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    redirect_uri_encoded: encodeURIComponent(SPOTIFY_REDIRECT_URI),
-    redirect_uri_length: SPOTIFY_REDIRECT_URI.length
-  });
+app.get('/api/spotify/status', async (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM spotify_data WHERE id = 1').get();
+    res.json({ 
+      connected: !!row?.access_token,
+      last_updated: row?.last_updated
+    });
+  } catch (e) {
+    res.json({ connected: false });
+  }
 });
 
 /* ---------- SPA fallback ---------- */
