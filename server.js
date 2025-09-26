@@ -5,64 +5,65 @@ import path from 'node:path';
 import express from 'express';
 import cookieSession from 'cookie-session';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize SQLite database
-const db = new Database(path.join(__dirname, 'site.db'));
+const dbPath = path.join(__dirname, 'site.db');
+const db = new sqlite3.Database(dbPath);
 
-// Initialize database tables if they don't exist
-function initDatabase() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS spotify_data (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      access_token TEXT NOT NULL,
-      refresh_token TEXT NOT NULL,
-      expires_at INTEGER NOT NULL,
-      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+// Initialize database tables
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS spotify_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    CREATE TABLE IF NOT EXISTS social_urls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      platform TEXT UNIQUE NOT NULL,
-      url TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+  db.run(`CREATE TABLE IF NOT EXISTS social_urls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT UNIQUE NOT NULL,
+    url TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    CREATE TABLE IF NOT EXISTS about_content (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      content TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+  db.run(`CREATE TABLE IF NOT EXISTS about_content (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    content TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-    CREATE TABLE IF NOT EXISTS gifted_subs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL,
-      gifts INTEGER NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  db.run(`CREATE TABLE IF NOT EXISTS gifted_subs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    gifts INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 
-  // Insert default social URLs if empty
-  const socialCount = db.prepare('SELECT COUNT(*) as count FROM social_urls').get();
-  if (socialCount.count === 0) {
-    const insertSocial = db.prepare('INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)');
-    insertSocial.run('twitch', 'https://www.twitch.tv/ThatLegendJackk');
-    insertSocial.run('tiktok', 'https://www.tiktok.com/@thatlegendjack');
-    insertSocial.run('kick', 'https://kick.com/ThatLegendJackk');
-    insertSocial.run('onlyfans', 'https://onlyfans.com/your-handle');
-  }
+  // Insert default data
+  db.get("SELECT COUNT(*) as count FROM social_urls", (err, row) => {
+    if (err) return;
+    if (row.count === 0) {
+      const stmt = db.prepare("INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)");
+      stmt.run('twitch', 'https://www.twitch.tv/ThatLegendJackk');
+      stmt.run('tiktok', 'https://www.tiktok.com/@thatlegendjack');
+      stmt.run('kick', 'https://kick.com/ThatLegendJackk');
+      stmt.run('onlyfans', 'https://onlyfans.com/your-handle');
+      stmt.finalize();
+    }
+  });
 
-  // Insert default about content if empty
-  const aboutCount = db.prepare('SELECT COUNT(*) as count FROM about_content').get();
-  if (aboutCount.count === 0) {
-    db.prepare('INSERT INTO about_content (content) VALUES (?)').run('This is your About Me section.');
-  }
-}
-
-initDatabase();
+  db.get("SELECT COUNT(*) as count FROM about_content", (err, row) => {
+    if (err) return;
+    if (row.count === 0) {
+      db.run("INSERT INTO about_content (content) VALUES (?)", ['This is your About Me section.']);
+    }
+  });
+});
 
 const app = express();
 app.set('trust proxy', 1);
@@ -115,88 +116,98 @@ app.get('/api/auth/status', (req, res) => {
 
 /* ---------- Social URLs API ---------- */
 app.get('/api/social-urls', (req, res) => {
-  try {
-    const urls = db.prepare('SELECT platform, url FROM social_urls').all();
+  db.all("SELECT platform, url FROM social_urls", (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to load social URLs' });
+    }
     const urlMap = {};
-    urls.forEach(row => { urlMap[row.platform] = row.url; });
+    rows.forEach(row => { urlMap[row.platform] = row.url; });
     res.json(urlMap);
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to load social URLs' });
-  }
+  });
 });
 
 app.post('/api/social-urls', express.json(), (req, res) => {
   if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
   
-  try {
-    const stmt = db.prepare('INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)');
-    Object.entries(req.body).forEach(([platform, url]) => {
-      if (url) stmt.run(platform, url);
-    });
+  const stmt = db.prepare("INSERT OR REPLACE INTO social_urls (platform, url) VALUES (?, ?)");
+  Object.entries(req.body).forEach(([platform, url]) => {
+    if (url) stmt.run(platform, url);
+  });
+  stmt.finalize((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to save social URLs' });
+    }
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save social URLs' });
-  }
+  });
 });
 
 /* ---------- About Content API ---------- */
 app.get('/api/about', (req, res) => {
-  try {
-    const row = db.prepare('SELECT content FROM about_content ORDER BY id DESC LIMIT 1').get();
+  db.get("SELECT content FROM about_content ORDER BY id DESC LIMIT 1", (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to load about content' });
+    }
     res.json({ content: row?.content || 'This is your About Me section.' });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to load about content' });
-  }
+  });
 });
 
 app.post('/api/about', express.json(), (req, res) => {
   if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
   
-  try {
-    db.prepare('INSERT INTO about_content (content) VALUES (?)').run(req.body.content);
+  db.run("INSERT INTO about_content (content) VALUES (?)", [req.body.content], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to save about content' });
+    }
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save about content' });
-  }
+  });
 });
 
 /* ---------- Gifted Subs API ---------- */
 app.get('/api/subs', (req, res) => {
-  try {
-    const subs = db.prepare('SELECT username, gifts FROM gifted_subs ORDER BY gifts DESC').all();
-    res.json(subs);
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to load subs' });
-  }
+  db.all("SELECT username, gifts FROM gifted_subs ORDER BY gifts DESC", (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to load subs' });
+    }
+    res.json(rows || []);
+  });
 });
 
 app.post('/api/subs', express.json(), (req, res) => {
   if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
   
-  try {
-    const { username, gifts } = req.body;
-    const existing = db.prepare('SELECT id FROM gifted_subs WHERE username = ?').get(username);
-    
-    if (existing) {
-      db.prepare('UPDATE gifted_subs SET gifts = ? WHERE username = ?').run(gifts, username);
-    } else {
-      db.prepare('INSERT INTO gifted_subs (username, gifts) VALUES (?, ?)').run(username, gifts);
+  const { username, gifts } = req.body;
+  db.get("SELECT id FROM gifted_subs WHERE username = ?", [username], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to save sub' });
     }
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to save sub' });
-  }
+    
+    if (row) {
+      db.run("UPDATE gifted_subs SET gifts = ? WHERE username = ?", [gifts, username], (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to update sub' });
+        }
+        res.json({ success: true });
+      });
+    } else {
+      db.run("INSERT INTO gifted_subs (username, gifts) VALUES (?, ?)", [username, gifts], (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'Failed to add sub' });
+        }
+        res.json({ success: true });
+      });
+    }
+  });
 });
 
 app.delete('/api/subs', (req, res) => {
   if (getRole(req) !== 'staff') return res.status(403).json({ error: 'Unauthorized' });
   
-  try {
-    db.prepare('DELETE FROM gifted_subs').run();
+  db.run("DELETE FROM gifted_subs", (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to reset subs' });
+    }
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to reset subs' });
-  }
+  });
 });
 
 /* ---------- Login Page ---------- */
@@ -279,10 +290,9 @@ app.get('/auth/spotify/callback', async (req, res) => {
     const j = await r.json();
     
     // Save to database
-    db.prepare(`
-      INSERT OR REPLACE INTO spotify_data (id, access_token, refresh_token, expires_at) 
-      VALUES (1, ?, ?, ?)
-    `).run(j.access_token, j.refresh_token, Date.now() + (j.expires_in || 3600) * 1000);
+    db.run(`INSERT OR REPLACE INTO spotify_data (id, access_token, refresh_token, expires_at) 
+            VALUES (1, ?, ?, ?)`, 
+            [j.access_token, j.refresh_token, Date.now() + (j.expires_in || 3600) * 1000]);
     
     res.redirect('/');
   } catch (e) {
@@ -290,13 +300,14 @@ app.get('/auth/spotify/callback', async (req, res) => {
   }
 });
 
-async function ensureSpotifyAccessToken() {
-  try {
-    const row = db.prepare('SELECT * FROM spotify_data WHERE id = 1').get();
-    if (!row || !row.refresh_token) return null;
+function ensureSpotifyAccessToken(callback) {
+  db.get("SELECT * FROM spotify_data WHERE id = 1", (err, row) => {
+    if (err || !row || !row.refresh_token) {
+      return callback(null);
+    }
     
     if (row.access_token && Date.now() < (row.expires_at || 0)) {
-      return row.access_token;
+      return callback(row.access_token);
     }
 
     // Refresh token
@@ -304,55 +315,59 @@ async function ensureSpotifyAccessToken() {
       grant_type: 'refresh_token',
       refresh_token: row.refresh_token
     });
-    const r = await fetch(SPOTIFY_TOKEN_URL, {
+    
+    fetch(SPOTIFY_TOKEN_URL, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${b64(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body
-    });
-    if (!r.ok) {
-      db.prepare('DELETE FROM spotify_data WHERE id = 1').run();
-      return null;
-    }
-    const j = await r.json();
-    db.prepare(`
-      UPDATE spotify_data SET access_token = ?, expires_at = ? WHERE id = 1
-    `).run(j.access_token, Date.now() + (j.expires_in || 3600) * 1000);
-    
-    return j.access_token;
-  } catch (e) {
-    return null;
-  }
+    })
+    .then(r => {
+      if (!r.ok) {
+        db.run("DELETE FROM spotify_data WHERE id = 1");
+        callback(null);
+        return;
+      }
+      return r.json();
+    })
+    .then(j => {
+      if (!j) return callback(null);
+      
+      db.run("UPDATE spotify_data SET access_token = ?, expires_at = ? WHERE id = 1", 
+             [j.access_token, Date.now() + (j.expires_in || 3600) * 1000]);
+      callback(j.access_token);
+    })
+    .catch(() => callback(null));
+  });
 }
 
 app.get('/api/spotify/now-playing', async (req, res) => {
-  try {
-    const at = await ensureSpotifyAccessToken();
+  ensureSpotifyAccessToken(async (at) => {
     if (!at) return res.status(401).json({ error: 'not_connected' });
     
-    const r = await fetch(NOW_PLAYING_URL, { headers: { Authorization: `Bearer ${at}` } });
-    if (r.status === 204) return res.json({ playing: false });
-    if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
-    
-    const data = await r.json();
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+    try {
+      const r = await fetch(NOW_PLAYING_URL, { headers: { Authorization: `Bearer ${at}` } });
+      if (r.status === 204) return res.json({ playing: false });
+      if (!r.ok) return res.status(r.status).json({ error: 'spotify_error' });
+      
+      const data = await r.json();
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 });
 
-app.get('/api/spotify/status', async (req, res) => {
-  try {
-    const row = db.prepare('SELECT * FROM spotify_data WHERE id = 1').get();
+app.get('/api/spotify/status', (req, res) => {
+  db.get("SELECT * FROM spotify_data WHERE id = 1", (err, row) => {
+    if (err) return res.json({ connected: false });
     res.json({ 
       connected: !!row?.access_token,
       last_updated: row?.last_updated
     });
-  } catch (e) {
-    res.json({ connected: false });
-  }
+  });
 });
 
 /* ---------- SPA fallback ---------- */
