@@ -19,7 +19,7 @@
   }
   @keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
-  /* Text scrolling animation */
+  /* Text scrolling animation - FIXED */
   @keyframes scrollText {
     0% { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
@@ -72,30 +72,29 @@
   .offline-btn{display:inline-block;padding:.55rem .9rem;border-radius:8px;background:linear-gradient(135deg,var(--ars-red),var(--ars-gold));
     color:#fff;text-decoration:none;font-weight:800}
 
-  /* RIGHT status circles (flush to right) */
+  /* RIGHT status circles (LARGER for Spotify) */
   .status-container{
     position:fixed; bottom:20px; right:0; z-index:30;
     display:flex; gap:1.2rem; flex-wrap:wrap; align-items:flex-end; padding-right:10px;
   }
   .circle{
-    width:160px; height:160px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:.86rem; text-align:center; padding:15px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
+    width:220px; height:220px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:0.85rem; text-align:center; padding:20px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
     overflow: hidden;
   }
   .spotify{border-color:#1DB954} .discord{border-color:#5865F2}
   .track{
     white-space: nowrap;
-    overflow: hidden;
+    overflow: visible;
     display: inline-block;
-    min-width: 100%;
+    min-width: auto;
     box-sizing: border-box;
-    padding: 0 10px;
-    text-overflow: ellipsis;
+    padding: 0 15px;
   }
   .track.scrolling {
-    animation: scrollText 15s linear infinite;
-    text-overflow: unset;
-    padding: 0 20px;
+    animation: scrollText 20s linear infinite;
+    padding: 0 25px;
+    min-width: max-content;
   }
 
   /* LEFT social circles */
@@ -179,7 +178,7 @@
       <div class="circle spotify" id="spotify-circle">
         <span class="track" id="spotify-track" title="Loading...">Spotify: Loading...</span>
       </div>
-      <div class="circle discord" id="discord-circle"><span id="discord-status">Discord: Offline</span></div>
+      <div class="circle discord" id="discord-circle"><span id="discord-status">Discord: Loading...</span></div>
     </div>
 
     <!-- Admin controls (hidden by default) -->
