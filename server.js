@@ -1,10 +1,12 @@
-// server.js — Express web service (+ Spotify OAuth, Discord config) — ESM
+// server.js — Express web service with SQLite database
 try { (await import('dotenv')).config(); } catch (_) {}
 
 import path from 'node:path';
 import express from 'express';
 import cookieSession from 'cookie-session';
 import { fileURLToPath } from 'node:url';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +15,37 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// Cookie session (used for admin auth)
+// Database setup
+let db;
+async function initDatabase() {
+  db = await open({
+    filename: './site.db',
+    driver: sqlite3.Database
+  });
+
+  // Create tables
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      message TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS gifted_subs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      gifts INTEGER DEFAULT 0,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  
+  console.log('Database initialized');
+}
+
+initDatabase();
+
+// Cookie session
 app.use(cookieSession({
   name: 'tlj_sess',
   keys: [process.env.SESSION_SECRET || 'dev_change_me'],
@@ -29,15 +61,153 @@ app.get('/healthz', (_, res) => res.status(200).send('ok'));
 /* ---------- Static files ---------- */
 app.use(express.static(__dirname, { extensions: ['html'] }));
 
-/* ---------- ENV to client (Discord ID only) ---------- */
+/* ---------- ENV to client ---------- */
 app.get('/api/config', (req, res) => {
   res.json({ 
     discord_user_id: process.env.DISCORD_USER_ID || null,
-    admin_secret: process.env.ADMIN_SECRET || 'dev_secret_change_me'
+    admin_secret: process.env.ADMIN_SECRET || 'dev_secret_change_me',
+    twitch_client_id: process.env.TWITCH_CLIENT_ID || '',
+    staff_logins: process.env.STAFF_LOGINS ? JSON.parse(process.env.STAFF_LOGINS) : []
   });
 });
 
-/* ---------- Global About Me (admin editable, everyone sees) ---------- */
+/* ---------- Staff Authentication ---------- */
+const STAFF_LOGINS = process.env.STAFF_LOGINS ? JSON.parse(process.env.STAFF_LOGINS) : [
+  { username: "ThatLegendJack", password: "BooBear24/7", role: "admin" }
+];
+
+function authenticateStaff(username, password) {
+  return STAFF_LOGINS.find(staff => 
+    staff.username === username && staff.password === password
+  );
+}
+
+app.post('/api/staff/login', express.json(), (req, res) => {
+  const { username, password } = req.body;
+  const staff = authenticateStaff(username, password);
+  
+  if (staff) {
+    req.session.staff = {
+      username: staff.username,
+      role: staff.role,
+      loggedIn: true
+    };
+    res.json({ success: true, user: staff.username, role: staff.role });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+});
+
+app.post('/api/staff/logout', (req, res) => {
+  req.session.staff = null;
+  res.json({ success: true });
+});
+
+app.get('/api/staff/check', (req, res) => {
+  if (req.session.staff?.loggedIn) {
+    res.json({ loggedIn: true, user: req.session.staff.username, role: req.session.staff.role });
+  } else {
+    res.json({ loggedIn: false });
+  }
+});
+
+/* ---------- Staff Chat Messages ---------- */
+app.get('/api/staff/messages', async (req, res) => {
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+  
+  try {
+    const messages = await db.all(
+      'SELECT username, message, timestamp FROM staff_messages ORDER BY timestamp DESC LIMIT 50'
+    );
+    res.json(messages.reverse()); // Return oldest first
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/staff/messages', express.json(), async (req, res) => {
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+  
+  const { message } = req.body;
+  if (!message || message.trim().length === 0) {
+    return res.status(400).json({ error: 'Message cannot be empty' });
+  }
+  
+  try {
+    await db.run(
+      'INSERT INTO staff_messages (username, message) VALUES (?, ?)',
+      [req.session.staff.username, message.trim()]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------- Gifted Subs (Database) ---------- */
+app.get('/api/subs', async (req, res) => {
+  try {
+    const subs = await db.all(
+      'SELECT username, gifts FROM gifted_subs ORDER BY gifts DESC, updated_at DESC'
+    );
+    res.json(subs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/subs', express.json(), async (req, res) => {
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+  
+  const { username, gifts } = req.body;
+  if (!username || gifts === undefined) {
+    return res.status(400).json({ error: 'Username and gifts required' });
+  }
+  
+  try {
+    const existing = await db.get(
+      'SELECT * FROM gifted_subs WHERE username = ?',
+      [username.toLowerCase()]
+    );
+    
+    if (existing) {
+      await db.run(
+        'UPDATE gifted_subs SET gifts = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?',
+        [gifts, username.toLowerCase()]
+      );
+    } else {
+      await db.run(
+        'INSERT INTO gifted_subs (username, gifts) VALUES (?, ?)',
+        [username.toLowerCase(), gifts]
+      );
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/subs', async (req, res) => {
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
+  }
+  
+  try {
+    await db.run('DELETE FROM gifted_subs');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* ---------- Global About Me ---------- */
 let globalAboutHTML = process.env.DEFAULT_ABOUT_HTML || '<p>Welcome to my stream! This is the About Me section.</p>';
 
 app.get('/api/about', (req, res) => {
@@ -45,17 +215,15 @@ app.get('/api/about', (req, res) => {
 });
 
 app.post('/api/about', express.json(), (req, res) => {
-  // Simple admin check
-  const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET || 'dev_secret_change_me'}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
   }
   
   globalAboutHTML = req.body.html || globalAboutHTML;
   res.json({ success: true });
 });
 
-/* ---------- Social Links (admin configurable) ---------- */
+/* ---------- Social Links ---------- */
 const defaultSocialLinks = {
   twitch: 'https://www.twitch.tv/ThatLegendJackk',
   tiktok: 'https://www.tiktok.com/@thatlegendjack', 
@@ -70,19 +238,17 @@ app.get('/api/social-links', (req, res) => {
 });
 
 app.post('/api/social-links', express.json(), (req, res) => {
-  const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.ADMIN_SECRET || 'dev_secret_change_me'}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
   }
   
   socialLinks = { ...socialLinks, ...req.body };
   res.json({ success: true });
 });
 
-/* ---------- Spotify OAuth (FIXED REDIRECT URI) ---------- */
+/* ---------- Spotify OAuth ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-// FIX: Trim any whitespace/line breaks from the redirect URI
 const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback').trim();
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
@@ -95,7 +261,7 @@ function authUrl(state) {
     response_type: 'code',
     client_id: SPOTIFY_CLIENT_ID,
     scope: scope,
-    redirect_uri: SPOTIFY_REDIRECT_URI, // FIXED: No extra spaces
+    redirect_uri: SPOTIFY_REDIRECT_URI,
     state: state,
     show_dialog: 'false'
   });
@@ -121,7 +287,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code: code.toString(),
-      redirect_uri: SPOTIFY_REDIRECT_URI // FIXED: Consistent URI
+      redirect_uri: SPOTIFY_REDIRECT_URI
     });
     
     const response = await fetch(SPOTIFY_TOKEN_URL, {
@@ -203,23 +369,47 @@ app.get('/api/spotify/now-playing', async (req, res) => {
   }
 });
 
-// Debug endpoint to check redirect URI
-app.get('/api/spotify/debug', (req, res) => {
-  res.json({
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    encoded_uri: encodeURIComponent(SPOTIFY_REDIRECT_URI),
-    has_client_id: !!SPOTIFY_CLIENT_ID,
-    has_client_secret: !!SPOTIFY_CLIENT_SECRET
-  });
+/* ---------- Twitch Bits Leaderboard ---------- */
+app.get('/api/twitch/bits', async (req, res) => {
+  const { count = 10, period = 'all' } = req.query;
+  
+  try {
+    const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
+    const TWITCH_ACCESS_TOKEN = process.env.TWITCH_ACCESS_TOKEN;
+    
+    if (!TWITCH_CLIENT_ID || !TWITCH_ACCESS_TOKEN) {
+      return res.status(501).json({ error: 'Twitch credentials not configured' });
+    }
+    
+    const url = new URL('https://api.twitch.tv/helix/bits/leaderboard');
+    url.searchParams.set('count', Math.min(Math.max(parseInt(count), 1), 10));
+    url.searchParams.set('period', period);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Client-Id': TWITCH_CLIENT_ID,
+        'Authorization': `Bearer ${TWITCH_ACCESS_TOKEN}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Twitch API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-/* ---------- Minimal login page ---------- */
+/* ---------- Login Page ---------- */
 app.get('/login.html', (req, res) => {
   res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Login - ThatLegendJack</title>
+<title>Staff Login - ThatLegendJack</title>
 <style>
   body{ margin:0; font-family:Arial,Helvetica,sans-serif; color:#fff; text-align:center;
     background:linear-gradient(135deg,#EF0107 0%,#FFF 35%,#063672 70%,#9C824A 100%); }
@@ -231,7 +421,7 @@ app.get('/login.html', (req, res) => {
 </style>
 </head>
 <body>
-  <h1>Login</h1>
+  <h1>Staff Login</h1>
   <form onsubmit="return doLogin(event)">
     <input id="username" placeholder="Username" required/>
     <input id="password" type="password" placeholder="Password" required/>
@@ -248,5 +438,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-if (typeof fetch !== 'function') console.error('Node 18+ required');
 app.listen(PORT, () => console.log('Server on :' + PORT));
