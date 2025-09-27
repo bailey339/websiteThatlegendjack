@@ -30,7 +30,7 @@ async function checkStaffAuth() {
 }
 
 async function doStaffLogin(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   const username = $('#staffUsername')?.value?.trim() || '';
   const password = $('#staffPassword')?.value?.trim() || '';
   
@@ -79,15 +79,38 @@ function applyStaffUI() {
   const isStaff = currentStaff !== null;
   
   // Update login/logout buttons
-  safe(() => $('#loginBtn').classList.toggle('hidden', isStaff));
-  safe(() => $('#logoutBtn').classList.toggle('hidden', !isStaff));
-  safe(() => $('#staffUsernameDisplay').textContent = isStaff ? currentStaff.username : ''));
+  safe(() => {
+    const loginBtn = $('#loginBtn');
+    const logoutBtn = $('#logoutBtn');
+    if (loginBtn) loginBtn.classList.toggle('hidden', isStaff);
+    if (logoutBtn) logoutBtn.classList.toggle('hidden', !isStaff);
+  });
+  
+  safe(() => {
+    const usernameDisplay = $('#staffUsernameDisplay');
+    if (usernameDisplay) usernameDisplay.textContent = isStaff ? currentStaff.username : '';
+  });
   
   // Show/hide staff controls
-  safe(() => $('#about-box').contentEditable = isStaff ? 'true' : 'false');
-  safe(() => $('#subs-controls').classList.toggle('hidden', !isStaff));
-  safe(() => $('#admin-controls').classList.toggle('hidden', !isStaff));
-  safe(() => $('#staff-chat-container').classList.toggle('hidden', !isStaff));
+  safe(() => {
+    const aboutBox = $('#about-box');
+    if (aboutBox) aboutBox.contentEditable = isStaff ? 'true' : 'false';
+  });
+  
+  safe(() => {
+    const subsControls = $('#subs-controls');
+    if (subsControls) subsControls.classList.toggle('hidden', !isStaff);
+  });
+  
+  safe(() => {
+    const adminControls = $('#admin-controls');
+    if (adminControls) adminControls.classList.toggle('hidden', !isStaff);
+  });
+  
+  safe(() => {
+    const staffChat = $('#staff-chat-container');
+    if (staffChat) staffChat.classList.toggle('hidden', !isStaff);
+  });
   
   if (isStaff) {
     loadSocialLinksForEdit();
@@ -99,7 +122,7 @@ let chatPollInterval = null;
 
 function startChatPolling() {
   stopChatPolling();
-  chatPollInterval = setInterval(loadStaffChat, 3000); // Poll every 3 seconds
+  chatPollInterval = setInterval(loadStaffChat, 3000);
 }
 
 function stopChatPolling() {
@@ -167,7 +190,8 @@ async function loadSubs() {
     renderSubs(subs);
   } catch (error) {
     console.warn('Failed to load subs:', error);
-    $('#subs-list').innerHTML = 'Error loading subs';
+    const subsList = $('#subs-list');
+    if (subsList) subsList.innerHTML = 'Error loading subs';
   }
 }
 
@@ -188,8 +212,10 @@ async function addOrUpdateSub() {
     });
     
     if (response.ok) {
-      $('#sub_user').value = '';
-      $('#sub_gifts').value = '';
+      const subUser = $('#sub_user');
+      const subGifts = $('#sub_gifts');
+      if (subUser) subUser.value = '';
+      if (subGifts) subGifts.value = '';
       loadSubs();
     } else {
       alert('Failed to update subs');
@@ -242,12 +268,11 @@ async function refreshBits() {
   if (!listEl) return;
   
   const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
-  const period = 'all'; // Always all-time now
   
   listEl.innerHTML = '<p>Loading…</p>';
   
   try {
-    const response = await fetch(`/api/twitch/bits?count=${count}&period=${period}`);
+    const response = await fetch(`/api/twitch/bits?count=${count}&period=all`);
     const data = await response.json();
     
     if (!response.ok) {
@@ -285,19 +310,28 @@ async function loadAbout(){
   try {
     const r = await fetch('/api/about');
     const data = await r.json();
-    if (data.html) $('#about-box').innerHTML = data.html;
+    const aboutBox = $('#about-box');
+    if (aboutBox && data.html) aboutBox.innerHTML = data.html;
   } catch {
-    $('#about-box').innerHTML = '<p>Welcome to my stream!</p>';
+    const aboutBox = $('#about-box');
+    if (aboutBox) aboutBox.innerHTML = '<p>Welcome to my stream!</p>';
   }
 }
 
 function toggleAboutEdit(enable=true){
-  safe(() => $('#about-box').contentEditable = enable ? 'true' : 'false');
-  safe(() => $('#about-save-row').classList.toggle('hidden', !enable));
+  safe(() => {
+    const aboutBox = $('#about-box');
+    if (aboutBox) aboutBox.contentEditable = enable ? 'true' : 'false';
+  });
+  safe(() => {
+    const saveRow = $('#about-save-row');
+    if (saveRow) saveRow.classList.toggle('hidden', !enable);
+  });
 }
 
 function saveAbout(){
-  const html = $('#about-box')?.innerHTML || '';
+  const aboutBox = $('#about-box');
+  const html = aboutBox?.innerHTML || '';
   
   fetch('/api/about', {
     method: 'POST',
@@ -338,10 +372,15 @@ async function loadSocialLinksForEdit(){
     const r = await fetch('/api/social-links');
     const links = await r.json();
     
-    $('#social-twitch-url').value = links.twitch || '';
-    $('#social-tiktok-url').value = links.tiktok || '';
-    $('#social-kick-url').value = links.kick || '';
-    $('#social-onlyfans-url').value = links.onlyfans || '';
+    const twitchUrl = $('#social-twitch-url');
+    const tiktokUrl = $('#social-tiktok-url');
+    const kickUrl = $('#social-kick-url');
+    const onlyfansUrl = $('#social-onlyfans-url');
+    
+    if (twitchUrl) twitchUrl.value = links.twitch || '';
+    if (tiktokUrl) tiktokUrl.value = links.tiktok || '';
+    if (kickUrl) kickUrl.value = links.kick || '';
+    if (onlyfansUrl) onlyfansUrl.value = links.onlyfans || '';
   } catch (e) {
     console.warn('Failed to load social links for edit:', e);
   }
@@ -404,11 +443,13 @@ async function loadDiscordConfig(){
     if (DISCORD_USER_ID) {
       connectLanyard();
     } else {
-      $('#discord-status').textContent = 'Discord: Not Configured';
+      const discordStatus = $('#discord-status');
+      if (discordStatus) discordStatus.textContent = 'Discord: Not Configured';
     }
   }catch(e){ 
     console.warn('Failed to load Discord config:', e);
-    $('#discord-status').textContent = 'Discord: Error';
+    const discordStatus = $('#discord-status');
+    if (discordStatus) discordStatus.textContent = 'Discord: Error';
   }
 }
 
@@ -505,13 +546,93 @@ async function updateSpotify(){
   spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
+/* ===== Event Binding ===== */
+function bindEvents() {
+  // Bits refresh button
+  const bitsRefreshBtn = $('#bits_refresh_btn');
+  if (bitsRefreshBtn) {
+    bitsRefreshBtn.addEventListener('click', function(e) { 
+      e.preventDefault(); 
+      refreshBits(); 
+    });
+  }
+  
+  // Subs buttons
+  const subsAddBtn = $('#subs_add_btn');
+  if (subsAddBtn) {
+    subsAddBtn.addEventListener('click', function(e) { 
+      e.preventDefault(); 
+      addOrUpdateSub(); 
+    });
+  }
+  
+  const subsResetBtn = $('#subs_reset_btn');
+  if (subsResetBtn) {
+    subsResetBtn.addEventListener('click', function(e) { 
+      e.preventDefault(); 
+      resetSubs(); 
+    });
+  }
+  
+  // Social links update button
+  const socialUpdateBtn = document.querySelector('button[onclick="updateSocialLinks()"]');
+  if (socialUpdateBtn) {
+    socialUpdateBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      updateSocialLinks();
+    });
+  }
+  
+  // About buttons
+  const aboutSaveBtn = document.querySelector('button[onclick="saveAbout()"]');
+  if (aboutSaveBtn) {
+    aboutSaveBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      saveAbout();
+    });
+  }
+  
+  const aboutCancelBtn = document.querySelector('button[onclick="toggleAboutEdit(false)"]');
+  if (aboutCancelBtn) {
+    aboutCancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleAboutEdit(false);
+    });
+  }
+  
+  // Staff chat
+  const staffChatSend = $('#staff-chat-send');
+  if (staffChatSend) {
+    staffChatSend.addEventListener('click', function(e) { 
+      e.preventDefault(); 
+      sendStaffMessage(); 
+    });
+  }
+  
+  const staffChatInput = $('#staff-chat-input');
+  if (staffChatInput) {
+    staffChatInput.addEventListener('keypress', function(e) { 
+      if (e.key === 'Enter') sendStaffMessage(); 
+    });
+  }
+  
+  // Logout button
+  const logoutBtn = $('#logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      doStaffLogout();
+    });
+  }
+}
+
 /* ===== Boot ===== */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', function() {
   // Navigation
   const map = { about:'about', leaderboards:'leaderboards' };
   document.querySelectorAll('.nav-center .nav-box').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = [...btn.classList].find(c => map[c]);
+    btn.addEventListener('click', function() {
+      const id = [...this.classList].find(c => map[c]);
       showSection(map[id] || 'home');
     });
   });
@@ -519,13 +640,13 @@ window.addEventListener('DOMContentLoaded', () => {
   showSection('home');
   loadAbout();
   loadSocialLinks();
-  loadSubs(); // Load from database
+  loadSubs();
 
   // Twitch embed
   if (typeof Twitch === 'undefined') {
     const twitchScript = document.createElement('script');
     twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
-    twitchScript.onload = () => initTwitch();
+    twitchScript.onload = function() { initTwitch(); };
     document.head.appendChild(twitchScript);
   } else { 
     initTwitch(); 
@@ -538,18 +659,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // Check staff authentication
   checkStaffAuth();
 
-  // Event listeners
-  $('#bits_refresh_btn')?.addEventListener('click', e => { e.preventDefault(); refreshBits(); });
-  $('#subs_add_btn')?.addEventListener('click', e => { e.preventDefault(); addOrUpdateSub(); });
-  $('#subs_reset_btn')?.addEventListener('click', e => { e.preventDefault(); resetSubs(); });
-  $('#staff-chat-send')?.addEventListener('click', e => { e.preventDefault(); sendStaffMessage(); });
-  $('#staff-chat-input')?.addEventListener('keypress', e => { 
-    if (e.key === 'Enter') sendStaffMessage(); 
-  });
-  
-  // Login form (for login.html)
-  const loginForm = document.querySelector('form[onsubmit="return doLogin(event)"]');
-  if (loginForm) {
-    loginForm.onsubmit = doStaffLogin;
-  }
+  // Bind all event listeners
+  bindEvents();
 });
