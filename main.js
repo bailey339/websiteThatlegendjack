@@ -7,33 +7,276 @@ function showSection(id){
   if (target){ target.classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); }
 }
 
-/* ===== Auth (client-side demo) ===== */
-const ADMIN_USER = "ThatLegendJack";
-const ADMIN_PASS = "BooBear24/7";
-let ADMIN_SECRET = '';
+/* ===== Staff Authentication ===== */
+let currentStaff = null;
 
-function setRole(r){ try{ localStorage.setItem('role', r);}catch{} }
-function getRole(){ try{ return localStorage.getItem('role') || 'guest'; }catch{ return 'guest'; } }
-
-function doLogout(){ setRole('guest'); location.href = '/'; }
-function doLogin(e){
-  e.preventDefault();
-  const u = $('#username')?.value?.trim() || '';
-  const p = $('#password')?.value?.trim() || '';
-  if (u === ADMIN_USER && p === ADMIN_PASS) { setRole('staff'); location.href = '/'; }
-  else alert('Invalid credentials');
+async function checkStaffAuth() {
+  try {
+    const response = await fetch('/api/staff/check');
+    const data = await response.json();
+    
+    if (data.loggedIn) {
+      currentStaff = { username: data.user, role: data.role };
+      applyStaffUI();
+      loadStaffChat();
+      startChatPolling();
+    } else {
+      currentStaff = null;
+      applyStaffUI();
+    }
+  } catch (error) {
+    console.warn('Auth check failed:', error);
+  }
 }
 
-function applyRoleUI(){
-  const isStaff = getRole() === 'staff';
-  safe(()=>$('#loginBtn').classList.toggle('hidden', isStaff));
-  safe(()=>$('#logoutBtn').classList.toggle('hidden', !isStaff));
-  safe(()=>$('#about-box').contentEditable = isStaff ? 'true' : 'false');
-  safe(()=>$('#subs-controls').classList.toggle('hidden', !isStaff));
-  safe(()=>$('#admin-controls').classList.toggle('hidden', !isStaff));
+async function doStaffLogin(e) {
+  e.preventDefault();
+  const username = $('#staffUsername')?.value?.trim() || '';
+  const password = $('#staffPassword')?.value?.trim() || '';
+  
+  if (!username || !password) {
+    alert('Please enter username and password');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/staff/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      currentStaff = { username: data.user, role: data.role };
+      applyStaffUI();
+      loadStaffChat();
+      startChatPolling();
+      if (window.location.pathname === '/login.html') {
+        window.location.href = '/';
+      }
+    } else {
+      alert('Login failed: ' + (data.error || 'Invalid credentials'));
+    }
+  } catch (error) {
+    alert('Login error: ' + error.message);
+  }
+}
+
+async function doStaffLogout() {
+  try {
+    await fetch('/api/staff/logout', { method: 'POST' });
+    currentStaff = null;
+    applyStaffUI();
+    stopChatPolling();
+  } catch (error) {
+    console.warn('Logout error:', error);
+  }
+}
+
+function applyStaffUI() {
+  const isStaff = currentStaff !== null;
+  
+  // Update login/logout buttons
+  safe(() => $('#loginBtn').classList.toggle('hidden', isStaff));
+  safe(() => $('#logoutBtn').classList.toggle('hidden', !isStaff));
+  safe(() => $('#staffUsernameDisplay').textContent = isStaff ? currentStaff.username : ''));
+  
+  // Show/hide staff controls
+  safe(() => $('#about-box').contentEditable = isStaff ? 'true' : 'false');
+  safe(() => $('#subs-controls').classList.toggle('hidden', !isStaff));
+  safe(() => $('#admin-controls').classList.toggle('hidden', !isStaff));
+  safe(() => $('#staff-chat-container').classList.toggle('hidden', !isStaff));
   
   if (isStaff) {
     loadSocialLinksForEdit();
+  }
+}
+
+/* ===== Staff Chat ===== */
+let chatPollInterval = null;
+
+function startChatPolling() {
+  stopChatPolling();
+  chatPollInterval = setInterval(loadStaffChat, 3000); // Poll every 3 seconds
+}
+
+function stopChatPolling() {
+  if (chatPollInterval) {
+    clearInterval(chatPollInterval);
+    chatPollInterval = null;
+  }
+}
+
+async function loadStaffChat() {
+  if (!currentStaff) return;
+  
+  try {
+    const response = await fetch('/api/staff/messages');
+    const messages = await response.json();
+    
+    const chatBox = $('#staff-chat-messages');
+    if (!chatBox) return;
+    
+    chatBox.innerHTML = messages.map(msg => `
+      <div class="chat-message">
+        <strong>${msg.username}:</strong> 
+        <span>${msg.message}</span>
+        <small>${new Date(msg.timestamp).toLocaleTimeString()}</small>
+      </div>
+    `).join('');
+    
+    chatBox.scrollTop = chatBox.scrollHeight;
+  } catch (error) {
+    console.warn('Failed to load chat:', error);
+  }
+}
+
+async function sendStaffMessage() {
+  if (!currentStaff) return;
+  
+  const input = $('#staff-chat-input');
+  const message = input?.value?.trim();
+  
+  if (!message) return;
+  
+  try {
+    const response = await fetch('/api/staff/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    
+    if (response.ok) {
+      input.value = '';
+      loadStaffChat();
+    } else {
+      alert('Failed to send message');
+    }
+  } catch (error) {
+    alert('Error sending message: ' + error.message);
+  }
+}
+
+/* ===== Gifted Subs (Database) ===== */
+async function loadSubs() {
+  try {
+    const response = await fetch('/api/subs');
+    const subs = await response.json();
+    renderSubs(subs);
+  } catch (error) {
+    console.warn('Failed to load subs:', error);
+    $('#subs-list').innerHTML = 'Error loading subs';
+  }
+}
+
+async function addOrUpdateSub() {
+  const username = $('#sub_user')?.value?.trim();
+  const gifts = parseInt($('#sub_gifts')?.value || '0', 10);
+  
+  if (!username || isNaN(gifts)) {
+    alert('Enter username and valid gifts number');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/subs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, gifts })
+    });
+    
+    if (response.ok) {
+      $('#sub_user').value = '';
+      $('#sub_gifts').value = '';
+      loadSubs();
+    } else {
+      alert('Failed to update subs');
+    }
+  } catch (error) {
+    alert('Error updating subs: ' + error.message);
+  }
+}
+
+async function resetSubs() {
+  if (!confirm('Reset all gifted subs?')) return;
+  
+  try {
+    const response = await fetch('/api/subs', { method: 'DELETE' });
+    
+    if (response.ok) {
+      loadSubs();
+    } else {
+      alert('Failed to reset subs');
+    }
+  } catch (error) {
+    alert('Error resetting subs: ' + error.message);
+  }
+}
+
+function renderSubs(subs) {
+  const box = $('#subs-list');
+  if (!box) return;
+  
+  if (!subs.length) {
+    box.innerHTML = 'No subs yet.';
+    return;
+  }
+  
+  const html = `<table>
+    <thead><tr><th>#</th><th>User</th><th>Gifted</th></tr></thead>
+    <tbody>
+      ${subs.map((s, i) => `
+        <tr><td>${i + 1}</td><td>${s.username}</td><td>${s.gifts}</td></tr>
+      `).join('')}
+    </tbody>
+  </table>`;
+  
+  box.innerHTML = html;
+}
+
+/* ===== Twitch Bits (Server-side) ===== */
+async function refreshBits() {
+  const listEl = $('#bits-list');
+  if (!listEl) return;
+  
+  const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
+  const period = 'all'; // Always all-time now
+  
+  listEl.innerHTML = '<p>Loading…</p>';
+  
+  try {
+    const response = await fetch(`/api/twitch/bits?count=${count}&period=${period}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'API error');
+    }
+    
+    if (!data.data || data.data.length === 0) {
+      listEl.innerHTML = '<p>No results.</p>';
+      return;
+    }
+    
+    const rows = data.data.map(entry => `
+      <tr>
+        <td>${entry.rank}</td>
+        <td>${entry.user_name || entry.user_login || entry.user_id}</td>
+        <td>${entry.score}</td>
+      </tr>
+    `).join('');
+    
+    listEl.innerHTML = `<table>
+      <thead><tr><th>#</th><th>User</th><th>Bits</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  } catch (err) {
+    listEl.innerHTML = `
+      <div style="padding:.6rem;background:rgba(0,0,0,.35);border-radius:8px">
+        <p><strong>Error:</strong> ${err.message}</p>
+        <p>Twitch credentials need to be configured on the server.</p>
+      </div>`;
   }
 }
 
@@ -49,8 +292,8 @@ async function loadAbout(){
 }
 
 function toggleAboutEdit(enable=true){
-  safe(()=>{ $('#about-box').contentEditable = enable ? 'true' : 'false'; });
-  safe(()=>{ $('#about-save-row').classList.toggle('hidden', !enable); });
+  safe(() => $('#about-box').contentEditable = enable ? 'true' : 'false');
+  safe(() => $('#about-save-row').classList.toggle('hidden', !enable));
 }
 
 function saveAbout(){
@@ -58,17 +301,14 @@ function saveAbout(){
   
   fetch('/api/about', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ADMIN_SECRET}`
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ html })
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
       toggleAboutEdit(false);
-      alert('About saved globally');
+      alert('About saved');
     } else {
       alert('Failed to save');
     }
@@ -82,12 +322,10 @@ async function loadSocialLinks(){
     const r = await fetch('/api/social-links');
     const links = await r.json();
     
-    // Update social link hrefs
     document.querySelectorAll('.social').forEach(link => {
       const platform = link.getAttribute('aria-label')?.toLowerCase();
       if (platform && links[platform]) {
         link.href = links[platform];
-        link.id = `social-${platform}`;
       }
     });
   } catch (e) {
@@ -100,7 +338,6 @@ async function loadSocialLinksForEdit(){
     const r = await fetch('/api/social-links');
     const links = await r.json();
     
-    // Populate edit fields
     $('#social-twitch-url').value = links.twitch || '';
     $('#social-tiktok-url').value = links.tiktok || '';
     $('#social-kick-url').value = links.kick || '';
@@ -120,17 +357,14 @@ function updateSocialLinks(){
   
   fetch('/api/social-links', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ADMIN_SECRET}`
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates)
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      alert('Social links updated globally');
-      loadSocialLinks(); // Refresh display
+      alert('Social links updated');
+      loadSocialLinks();
     } else {
       alert('Failed to update social links');
     }
@@ -138,48 +372,19 @@ function updateSocialLinks(){
   .catch(() => alert('Error updating social links'));
 }
 
-/* ===== Subs (local) ===== */
-const SUBS_KEY = 'gifted_subs_alltime_v1';
-function lsGetSubs(){ try{ return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]'); }catch{return [];} }
-function lsSetSubs(v){ try{ localStorage.setItem(SUBS_KEY, JSON.stringify(v)); }catch{} }
-
-function addOrUpdateSub(){
-  const u = $('#sub_user')?.value?.trim();
-  const n = parseInt($('#sub_gifts')?.value || '0', 10);
-  if (!u || isNaN(n)) return alert('Enter username and gifts');
-  const list = lsGetSubs();
-  const i = list.findIndex(x => (x.username || x.user || '').toLowerCase() === u.toLowerCase());
-  if (i >= 0) { list[i].gifts = n; list[i].username = list[i].username || list[i].user || u; }
-  else { list.push({ username: u, gifts: n }); }
-  lsSetSubs(list);
-  renderSubs();
-}
-
-function resetSubs(){
-  if (!confirm('Reset all gifted subs?')) return;
-  try{ localStorage.removeItem(SUBS_KEY); }catch{}
-  renderSubs();
-}
-
-function renderSubs(){
-  const rows = lsGetSubs();
-  const box = $('#subs-list');
-  if (!box) return;
-  if (!rows.length){ box.innerHTML = 'No subs yet.'; return; }
-  const sorted = [...rows].sort((a,b)=>(b.gifts||0)-(a.gifts||0));
-  box.innerHTML = `<table><thead><tr><th>#</th><th>User</th><th>Gifted</th></tr></thead><tbody>${
-    sorted.map((s,i)=>`<tr><td>${i+1}</td><td>${s.username||s.user}</td><td>${s.gifts}</td></tr>`).join('')
-  }</tbody></table>`;
-}
-
 /* ===== Twitch Embed ===== */
 const TWITCH_CHANNEL = 'ThatLegendJackk';
 let twitchEmbed = null;
+
 function initTwitch(){
   const el = document.getElementById('twitch-player');
   if (!el) return;
-  if (typeof Twitch === 'undefined' || !Twitch.Embed){ setTimeout(initTwitch, 250); return; }
+  if (typeof Twitch === 'undefined' || !Twitch.Embed){ 
+    setTimeout(initTwitch, 250); 
+    return; 
+  }
   if (twitchEmbed) return;
+  
   const parentHost = location.hostname || 'localhost';
   twitchEmbed = new Twitch.Embed('twitch-player', {
     width:'100%', height:'100%', channel: TWITCH_CHANNEL, layout:'video', muted:true,
@@ -187,67 +392,7 @@ function initTwitch(){
   });
 }
 
-/* ===== Twitch Bits (client creds) ===== */
-function saveTwitchCreds(){
-  const cid = $('#twitch_client_id')?.value?.trim();
-  const tok = $('#twitch_access_token')?.value?.trim();
-  if (!cid || !tok) return alert('Paste both Client ID and Access Token');
-  try{
-    localStorage.setItem('twitch_client_id', cid);
-    localStorage.setItem('twitch_access_token', tok);
-    alert('Saved.');
-  }catch{ alert('Could not save.'); }
-}
-
-async function helix(path, params={}){
-  const cid = localStorage.getItem('twitch_client_id') || '';
-  const tok = localStorage.getItem('twitch_access_token') || '';
-  if (!cid || !tok) throw new Error('Missing Twitch credentials.');
-  const url = new URL(`https://api.twitch.tv/helix/${path}`);
-  Object.entries(params).forEach(([k,v])=>{ if (v!==undefined && v!==null && v!=='') url.searchParams.set(k,v); });
-  const res = await fetch(url, { headers: { 'Client-Id': cid, 'Authorization': `Bearer ${tok}` } });
-  if (!res.ok){ const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
-  return res.json();
-}
-
-async function getUsersMap(userIds){
-  if (!userIds.length) return new Map();
-  const cid = localStorage.getItem('twitch_client_id') || '';
-  const tok = localStorage.getItem('twitch_access_token') || '';
-  const url = new URL('https://api.twitch.tv/helix/users');
-  userIds.forEach(id => url.searchParams.append('id', id));
-  const res = await fetch(url, { headers: { 'Client-Id': cid, 'Authorization': `Bearer ${tok}` } });
-  if (!res.ok){ const body = await res.text(); throw new Error(`${res.status} ${res.statusText}: ${body}`); }
-  const { data } = await res.json();
-  const map = new Map(); for (const u of data) map.set(u.id, u);
-  return map;
-}
-
-async function refreshBits(){
-  const listEl = $('#bits-list'); if (!listEl) return;
-  const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
-  const period = $('#bits_period')?.value || 'all';
-  listEl.innerHTML = '<p>Loading…</p>';
-  try{
-    const { data: entries } = await helix('bits/leaderboard', { count, period });
-    const ids = [...new Set(entries.map(e => e.user_id).filter(Boolean))];
-    const usersMap = await getUsersMap(ids);
-    if (!entries.length){ listEl.innerHTML = '<p>No results.</p>'; return; }
-    const rows = entries.map(e=>{
-      const u = usersMap.get(e.user_id);
-      const name = u?.display_name || u?.login || e.user_name || e.user_login || e.user_id;
-      return `<tr><td>${e.rank}</td><td>${name}</td><td>${e.score}</td></tr>`;
-    }).join('');
-    listEl.innerHTML = `<table><thead><tr><th>#</th><th>User</th><th>Bits</th></tr></thead><tbody>${rows}</tbody></table>`;
-  }catch(err){
-    listEl.innerHTML = `<div style="padding:.6rem;background:rgba(0,0,0,.35);border-radius:8px">
-      <p><strong>Error:</strong> ${err.message}</p>
-      <p>Use a <em>User access token</em> with <code>bits:read</code> scope and matching Client ID.</p>
-    </div>`;
-  }
-}
-
-/* ===== Discord Presence via Lanyard ===== */
+/* ===== Discord Presence ===== */
 let DISCORD_USER_ID = '';
 let lanyardWs = null;
 
@@ -255,7 +400,6 @@ async function loadDiscordConfig(){
   try{
     const cfg = await fetch('/api/config').then(r => r.json());
     DISCORD_USER_ID = cfg?.discord_user_id || '';
-    ADMIN_SECRET = cfg?.admin_secret || 'dev_secret_change_me';
     
     if (DISCORD_USER_ID) {
       connectLanyard();
@@ -278,9 +422,7 @@ function connectLanyard(){
   lanyardWs.addEventListener('open', () => {
     lanyardWs.send(JSON.stringify({
       op: 2,
-      d: {
-        subscribe_to_id: DISCORD_USER_ID
-      }
+      d: { subscribe_to_id: DISCORD_USER_ID }
     }));
   });
   
@@ -294,9 +436,7 @@ function connectLanyard(){
       }
       
       if (data.t === 'INIT_STATE' || data.t === 'PRESENCE_UPDATE') {
-        const userData = data.d;
-        const status = userData?.discord_status || 'offline';
-        
+        const status = data.d?.discord_status || 'offline';
         const statusEl = $('#discord-status');
         if (statusEl) {
           statusEl.textContent = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
@@ -310,14 +450,11 @@ function connectLanyard(){
   lanyardWs.addEventListener('close', () => {
     setTimeout(connectLanyard, 5000);
   });
-  
-  lanyardWs.addEventListener('error', (error) => {
-    console.warn('Lanyard WebSocket error:', error);
-  });
 }
 
 /* ===== Spotify Live Status ===== */
 let spotifyTimer = null;
+
 async function updateSpotify(){
   const el = $('#spotify-track');
   if (!el) return;
@@ -368,19 +505,11 @@ async function updateSpotify(){
   spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
-/* ===== Social Links Initialization ===== */
-function initSocialLinks() {
-  loadSocialLinks();
-  
-  if (getRole() === 'staff') {
-    loadSocialLinksForEdit();
-  }
-}
-
 /* ===== Boot ===== */
 window.addEventListener('DOMContentLoaded', () => {
+  // Navigation
   const map = { about:'about', leaderboards:'leaderboards' };
-  document.querySelectorAll('.nav-center .nav-box').forEach(btn=>{
+  document.querySelectorAll('.nav-center .nav-box').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = [...btn.classList].find(c => map[c]);
       showSection(map[id] || 'home');
@@ -388,28 +517,39 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   showSection('home');
-  applyRoleUI();
   loadAbout();
-  initSocialLinks();
-  renderSubs();
+  loadSocialLinks();
+  loadSubs(); // Load from database
 
+  // Twitch embed
   if (typeof Twitch === 'undefined') {
     const twitchScript = document.createElement('script');
     twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
     twitchScript.onload = () => initTwitch();
     document.head.appendChild(twitchScript);
-  } else { initTwitch(); }
+  } else { 
+    initTwitch(); 
+  }
 
+  // Discord + Spotify
   loadDiscordConfig();
   updateSpotify();
 
-  const idEl = $('#twitch_client_id');
-  const tkEl = $('#twitch_access_token');
-  if (idEl) idEl.value = localStorage.getItem('twitch_client_id') || '';
-  if (tkEl) tkEl.value = localStorage.getItem('twitch_access_token') || '';
+  // Check staff authentication
+  checkStaffAuth();
 
+  // Event listeners
   $('#bits_refresh_btn')?.addEventListener('click', e => { e.preventDefault(); refreshBits(); });
   $('#subs_add_btn')?.addEventListener('click', e => { e.preventDefault(); addOrUpdateSub(); });
   $('#subs_reset_btn')?.addEventListener('click', e => { e.preventDefault(); resetSubs(); });
-  $('#twitch_save_btn')?.addEventListener('click', e => { e.preventDefault(); saveTwitchCreds(); });
+  $('#staff-chat-send')?.addEventListener('click', e => { e.preventDefault(); sendStaffMessage(); });
+  $('#staff-chat-input')?.addEventListener('keypress', e => { 
+    if (e.key === 'Enter') sendStaffMessage(); 
+  });
+  
+  // Login form (for login.html)
+  const loginForm = document.querySelector('form[onsubmit="return doLogin(event)"]');
+  if (loginForm) {
+    loginForm.onsubmit = doStaffLogin;
+  }
 });
