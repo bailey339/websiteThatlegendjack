@@ -422,9 +422,9 @@ app.get('/login.html', (req, res) => {
 </head>
 <body>
   <h1>Staff Login</h1>
-  <form onsubmit="return doLogin(event)">
-    <input id="username" placeholder="Username" required/>
-    <input id="password" type="password" placeholder="Password" required/>
+  <form onsubmit="return doStaffLogin(event)">
+    <input id="staffUsername" placeholder="Username" required/>
+    <input id="staffPassword" type="password" placeholder="Password" required/>
     <button type="submit">Login</button>
   </form>
   <script src="/main.js"></script>
