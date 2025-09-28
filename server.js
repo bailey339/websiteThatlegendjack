@@ -246,6 +246,17 @@ app.post('/api/social-links', express.json(), (req, res) => {
   res.json({ success: true });
 });
 
+/* ---------- Partnered Servers ---------- */
+app.get('/api/partnered-servers', (req, res) => {
+  try {
+    const partneredServers = process.env.PARTNERED_SERVERS ? JSON.parse(process.env.PARTNERED_SERVERS) : [];
+    res.json(partneredServers);
+  } catch (error) {
+    console.error('Error parsing partnered servers:', error);
+    res.status(500).json({ error: 'Failed to load partnered servers' });
+  }
+});
+
 /* ---------- Spotify OAuth ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
