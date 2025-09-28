@@ -44,20 +44,20 @@
   .about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
   .leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
 
-  /* Staff Chat - LARGER and only on home page */
-  #staff-chat-container{
-    position:fixed; 
-    top:80px; 
-    right:20px; 
-    width:calc(75% - 60px); /* Reduced width by 25% */
-    max-width:375px; /* Reduced from 500px */
-    height:calc(75vh - 250px); /* Reduced height by 25% */
-    background:rgba(0,0,0,0.95); 
-    border-radius:10px; 
-    z-index:35; 
-    border:2px solid var(--ars-gold);
-    display: none;
-  }
+/* Staff Chat - LARGER and only on home page */
+#staff-chat-container{
+  position:fixed; 
+  top:80px; 
+  right:20px; 
+  width:calc(85% - 40px); /* Increased width by 10% */
+  max-width:412px; /* Increased from 375px */
+  height:calc(85vh - 200px); /* Increased height by 10% */
+  background:rgba(0,0,0,0.95); 
+  border-radius:10px; 
+  z-index:35; 
+  border:2px solid var(--ars-gold);
+  display: none;
+}
   #staff-chat-container.visible {
     display: block;
   }
@@ -337,5 +337,6 @@
   <script src="main.js"></script>
 </body>
 </html>
+
 
 
