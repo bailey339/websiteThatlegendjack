@@ -4,7 +4,11 @@ function $(sel){ return document.querySelector(sel); }
 function showSection(id){
   document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
   const target = document.getElementById(id);
-  if (target){ target.classList.remove('hidden'); window.scrollTo({top:0,behavior:'smooth'}); }
+  if (target){ 
+    target.classList.remove('hidden'); 
+    window.scrollTo({top:0,behavior:'smooth'}); 
+  }
+  updateStaffChatVisibility();
 }
 
 /* ===== Staff Authentication ===== */
@@ -107,13 +111,27 @@ function applyStaffUI() {
     if (adminControls) adminControls.classList.toggle('hidden', !isStaff);
   });
   
-  safe(() => {
-    const staffChat = $('#staff-chat-container');
-    if (staffChat) staffChat.classList.toggle('hidden', !isStaff);
-  });
+  updateStaffChatVisibility();
   
   if (isStaff) {
     loadSocialLinksForEdit();
+  }
+}
+
+/* ===== Staff Chat Visibility ===== */
+function updateStaffChatVisibility() {
+  const staffChat = $('#staff-chat-container');
+  if (!staffChat) return;
+  
+  const isHomePage = !$('#home').classList.contains('hidden');
+  const shouldShow = currentStaff && isHomePage;
+  
+  if (shouldShow) {
+    staffChat.classList.remove('hidden');
+    staffChat.classList.add('visible');
+  } else {
+    staffChat.classList.add('hidden');
+    staffChat.classList.remove('visible');
   }
 }
 
@@ -548,6 +566,26 @@ async function updateSpotify(){
 
 /* ===== Event Binding ===== */
 function bindEvents() {
+  // Navigation buttons
+  document.querySelectorAll('.nav-box.about').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showSection('about');
+    });
+  });
+  
+  document.querySelectorAll('.nav-box.leaderboards').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showSection('leaderboards');
+    });
+  });
+  
+  // Back buttons
+  document.querySelectorAll('.back-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showSection('home');
+    });
+  });
+  
   // Bits refresh button
   const bitsRefreshBtn = $('#bits_refresh_btn');
   if (bitsRefreshBtn) {
@@ -575,7 +613,7 @@ function bindEvents() {
   }
   
   // Social links update button
-  const socialUpdateBtn = document.querySelector('button[onclick="updateSocialLinks()"]');
+  const socialUpdateBtn = document.querySelector('#admin-controls button');
   if (socialUpdateBtn) {
     socialUpdateBtn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -584,7 +622,7 @@ function bindEvents() {
   }
   
   // About buttons
-  const aboutSaveBtn = document.querySelector('button[onclick="saveAbout()"]');
+  const aboutSaveBtn = document.querySelector('#about-save-row button:first-child');
   if (aboutSaveBtn) {
     aboutSaveBtn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -592,7 +630,7 @@ function bindEvents() {
     });
   }
   
-  const aboutCancelBtn = document.querySelector('button[onclick="toggleAboutEdit(false)"]');
+  const aboutCancelBtn = document.querySelector('#about-save-row button:last-child');
   if (aboutCancelBtn) {
     aboutCancelBtn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -628,15 +666,6 @@ function bindEvents() {
 
 /* ===== Boot ===== */
 window.addEventListener('DOMContentLoaded', function() {
-  // Navigation
-  const map = { about:'about', leaderboards:'leaderboards' };
-  document.querySelectorAll('.nav-center .nav-box').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const id = [...this.classList].find(c => map[c]);
-      showSection(map[id] || 'home');
-    });
-  });
-
   showSection('home');
   loadAbout();
   loadSocialLinks();
