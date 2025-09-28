@@ -43,21 +43,22 @@
   .home{display:none} /* Hide home button */
   .about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
   .leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
+  .partnered{background:linear-gradient(135deg,var(--ars-gold),var(--ars-white))}
 
-/* Staff Chat - LARGER and only on home page */
-#staff-chat-container{
-  position:fixed; 
-  top:80px; 
-  right:20px; 
-  width:calc(85% - 40px); /* Increased width by 10% */
-  max-width:412px; /* Increased from 375px */
-  height:calc(85vh - 200px); /* Increased height by 10% */
-  background:rgba(0,0,0,0.95); 
-  border-radius:10px; 
-  z-index:35; 
-  border:2px solid var(--ars-gold);
-  display: none;
-}
+  /* Staff Chat - LARGER and only on home page */
+  #staff-chat-container{
+    position:fixed; 
+    top:80px; 
+    right:20px; 
+    width:calc(85% - 40px);
+    max-width:412px;
+    height:calc(85vh - 200px);
+    background:rgba(0,0,0,0.95); 
+    border-radius:10px; 
+    z-index:35; 
+    border:2px solid var(--ars-gold);
+    display: none;
+  }
   #staff-chat-container.visible {
     display: block;
   }
@@ -123,6 +124,46 @@
   }
   #staff-chat-send:hover{background:var(--ars-gold)}
 
+  /* Partnered Servers Styles */
+  .server-card {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .server-info {
+    flex: 1;
+    text-align: left;
+  }
+  .server-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--ars-gold);
+    font-size: 1.2rem;
+  }
+  .server-info p {
+    margin: 0;
+    color: #ccc;
+    font-size: 0.9rem;
+  }
+  .join-btn {
+    background: var(--ars-red);
+    color: white;
+    padding: 0.7rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .join-btn:hover {
+    background: var(--ars-gold);
+  }
+
   /* Unified surfaces */
   .surface{
     max-width:1100px;margin:1rem auto;padding:1.2rem 1.2rem 1.4rem;
@@ -132,8 +173,9 @@
   }
   .surface-about{ background:linear-gradient(135deg, rgba(239,1,7,.85), rgba(156,130,74,.85)); }
   .surface-leader{ background:linear-gradient(135deg, rgba(6,54,114,.85), rgba(255,255,255,.38)); }
+  .surface-partnered{ background:linear-gradient(135deg, rgba(156,130,74,.85), rgba(255,255,255,.38)); }
 
-  /* Go back (About/Leaderboards) */
+  /* Go back (About/Leaderboards/Partnered) */
   .back-btn{
     position:fixed; top:10px; left:20px; z-index:35;
     padding:.5rem .9rem; border:none; border-radius:10px; font-weight:800; cursor:pointer; color:#fff;
@@ -231,6 +273,7 @@
   <div class="nav-center">
     <div class="nav-box about" role="button">About Me</div>
     <div class="nav-box leaderboards" role="button">Leaderboards</div>
+    <div class="nav-box partnered" role="button">Partnered Servers</div>
   </div>
 
   <!-- LEFT SOCIAL CIRCLES -->
@@ -333,10 +376,18 @@
     </div>
   </section>
 
+  <!-- PARTNERED SERVERS -->
+  <section id="partnered" class="hidden">
+    <button class="back-btn">Go back</button>
+    <div class="surface surface-partnered">
+      <h2>Partnered Discord Servers</h2>
+      <div id="partnered-servers-list">
+        Loading partnered servers...
+      </div>
+    </div>
+  </section>
+
   <script src="https://embed.twitch.tv/embed/v1.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
-
-
-
