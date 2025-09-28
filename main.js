@@ -82,7 +82,6 @@ async function doStaffLogout() {
 function applyStaffUI() {
   const isStaff = currentStaff !== null;
   
-  // Update login/logout buttons
   safe(() => {
     const loginBtn = $('#loginBtn');
     const logoutBtn = $('#logoutBtn');
@@ -95,7 +94,6 @@ function applyStaffUI() {
     if (usernameDisplay) usernameDisplay.textContent = isStaff ? currentStaff.username : '';
   });
   
-  // Show/hide staff controls
   safe(() => {
     const aboutBox = $('#about-box');
     if (aboutBox) aboutBox.contentEditable = isStaff ? 'true' : 'false';
@@ -248,7 +246,6 @@ async function resetSubs() {
   
   try {
     const response = await fetch('/api/subs', { method: 'DELETE' });
-    
     if (response.ok) {
       loadSubs();
     } else {
@@ -344,10 +341,10 @@ function renderPartneredServers(servers) {
     container.innerHTML = '<p>No partnered servers configured yet.</p>';
     return;
   }
-  
+
   const html = servers.map(server => `
     <div class="server-card">
-      <img src="${server.image}" alt="${server.name}" style="width:70px;height:70px;border-radius:8px;object-fit:cover;">
+      <img class="server-image" src="${server.image}" alt="${server.name}">
       <div class="server-info">
         <h4>${server.name}</h4>
         <p>${server.description}</p>
@@ -358,7 +355,6 @@ function renderPartneredServers(servers) {
   
   container.innerHTML = html;
 }
-
 /* ===== Global About Me ===== */
 async function loadAbout(){
   try {
@@ -509,27 +505,20 @@ async function loadDiscordConfig(){
 
 function connectLanyard(){
   if (!DISCORD_USER_ID) return;
-  
   if (lanyardWs) lanyardWs.close();
-  
   lanyardWs = new WebSocket('wss://api.lanyard.rest/socket');
-  
+
   lanyardWs.addEventListener('open', () => {
-    lanyardWs.send(JSON.stringify({
-      op: 2,
-      d: { subscribe_to_id: DISCORD_USER_ID }
-    }));
+    lanyardWs.send(JSON.stringify({ op: 2, d: { subscribe_to_id: DISCORD_USER_ID } }));
   });
-  
+
   lanyardWs.addEventListener('message', (event) => {
     try{
       const data = JSON.parse(event.data);
-      
       if (data.op === 1) {
         lanyardWs.send(JSON.stringify({ op: 3 }));
         return;
       }
-      
       if (data.t === 'INIT_STATE' || data.t === 'PRESENCE_UPDATE') {
         const status = data.d?.discord_status || 'offline';
         const statusEl = $('#discord-status');
@@ -537,11 +526,9 @@ function connectLanyard(){
           statusEl.textContent = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
         }
       }
-    }catch(e){
-      console.warn('Lanyard message error:', e);
-    }
+    }catch(e){ console.warn('Lanyard message error:', e); }
   });
-  
+
   lanyardWs.addEventListener('close', () => {
     setTimeout(connectLanyard, 5000);
   });
@@ -553,20 +540,16 @@ let spotifyTimer = null;
 async function updateSpotify(){
   const el = $('#spotify-track');
   if (!el) return;
-  
   try {
     const r = await fetch('/api/spotify/now-playing');
-    
     if (r.status === 401) {
       el.textContent = 'Spotify: Not Connected';
       el.title = 'Go to /auth/spotify/login to connect';
       el.classList.remove('scrolling');
       return;
     }
-    
     if (r.ok) {
       const data = await r.json();
-      
       if (data.error === 'not_connected' || !data || data.playing === false || !data.item) {
         el.textContent = 'Spotify: Not Playing';
         el.title = 'Spotify: Not Playing';
@@ -602,7 +585,6 @@ async function updateSpotify(){
 
 /* ===== Event Binding ===== */
 function bindEvents() {
-  // Navigation buttons
   document.querySelectorAll('.nav-box.about').forEach(btn => {
     btn.addEventListener('click', function() {
       showSection('about');
@@ -622,14 +604,12 @@ function bindEvents() {
     });
   });
   
-  // Back buttons
   document.querySelectorAll('.back-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       showSection('home');
     });
   });
-  
-  // Bits refresh button
+
   const bitsRefreshBtn = $('#bits_refresh_btn');
   if (bitsRefreshBtn) {
     bitsRefreshBtn.addEventListener('click', function(e) { 
@@ -637,8 +617,7 @@ function bindEvents() {
       refreshBits(); 
     });
   }
-  
-  // Subs buttons
+
   const subsAddBtn = $('#subs_add_btn');
   if (subsAddBtn) {
     subsAddBtn.addEventListener('click', function(e) { 
@@ -654,8 +633,7 @@ function bindEvents() {
       resetSubs(); 
     });
   }
-  
-  // Social links update button
+
   const socialUpdateBtn = document.querySelector('#admin-controls button');
   if (socialUpdateBtn) {
     socialUpdateBtn.addEventListener('click', function(e) {
@@ -663,8 +641,7 @@ function bindEvents() {
       updateSocialLinks();
     });
   }
-  
-  // About buttons
+
   const aboutSaveBtn = document.querySelector('#about-save-row button:first-child');
   if (aboutSaveBtn) {
     aboutSaveBtn.addEventListener('click', function(e) {
@@ -680,8 +657,7 @@ function bindEvents() {
       toggleAboutEdit(false);
     });
   }
-  
-  // Staff chat
+
   const staffChatSend = $('#staff-chat-send');
   if (staffChatSend) {
     staffChatSend.addEventListener('click', function(e) { 
@@ -696,8 +672,7 @@ function bindEvents() {
       if (e.key === 'Enter') sendStaffMessage(); 
     });
   }
-  
-  // Logout button
+
   const logoutBtn = $('#logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function(e) {
@@ -714,7 +689,6 @@ window.addEventListener('DOMContentLoaded', function() {
   loadSocialLinks();
   loadSubs();
 
-  // Twitch embed
   if (typeof Twitch === 'undefined') {
     const twitchScript = document.createElement('script');
     twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
@@ -724,13 +698,8 @@ window.addEventListener('DOMContentLoaded', function() {
     initTwitch(); 
   }
 
-  // Discord + Spotify
   loadDiscordConfig();
   updateSpotify();
-
-  // Check staff authentication
   checkStaffAuth();
-
-  // Bind all event listeners
   bindEvents();
 });
