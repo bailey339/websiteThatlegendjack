@@ -323,6 +323,41 @@ async function refreshBits() {
   }
 }
 
+/* ===== Partnered Servers ===== */
+async function loadPartneredServers() {
+  try {
+    const response = await fetch('/api/partnered-servers');
+    const servers = await response.json();
+    renderPartneredServers(servers);
+  } catch (error) {
+    console.warn('Failed to load partnered servers:', error);
+    const serversList = $('#partnered-servers-list');
+    if (serversList) serversList.innerHTML = 'Error loading partnered servers';
+  }
+}
+
+function renderPartneredServers(servers) {
+  const container = $('#partnered-servers-list');
+  if (!container) return;
+  
+  if (!servers.length) {
+    container.innerHTML = '<p>No partnered servers configured yet.</p>';
+    return;
+  }
+  
+  const html = servers.map(server => `
+    <div class="server-card">
+      <div class="server-info">
+        <h4>${server.name}</h4>
+        <p>${server.description}</p>
+      </div>
+      <a href="${server.inviteLink}" target="_blank" class="join-btn">Join Server</a>
+    </div>
+  `).join('');
+  
+  container.innerHTML = html;
+}
+
 /* ===== Global About Me ===== */
 async function loadAbout(){
   try {
@@ -576,6 +611,13 @@ function bindEvents() {
   document.querySelectorAll('.nav-box.leaderboards').forEach(btn => {
     btn.addEventListener('click', function() {
       showSection('leaderboards');
+    });
+  });
+  
+  document.querySelectorAll('.nav-box.partnered').forEach(btn => {
+    btn.addEventListener('click', function() {
+      showSection('partnered');
+      loadPartneredServers();
     });
   });
   
