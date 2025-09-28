@@ -44,34 +44,82 @@
   .about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
   .leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
 
-  /* Staff Chat */
+  /* Staff Chat - LARGER and only on home page */
   #staff-chat-container{
-    position:fixed; top:80px; right:20px; width:300px; background:rgba(0,0,0,0.9); 
-    border-radius:10px; z-index:35; border:2px solid var(--ars-gold);
+    position:fixed; 
+    top:80px; 
+    right:20px; 
+    width:calc(100% - 40px); 
+    max-width:500px;
+    height:calc(100vh - 200px); 
+    background:rgba(0,0,0,0.95); 
+    border-radius:10px; 
+    z-index:35; 
+    border:2px solid var(--ars-gold);
+    display: none;
+  }
+  #staff-chat-container.visible {
+    display: block;
   }
   #staff-chat-container > div:first-child{
-    padding:10px; border-bottom:1px solid #333; background:rgba(239,1,7,0.3);
+    padding:10px; 
+    border-bottom:1px solid #333; 
+    background:rgba(239,1,7,0.3);
     font-weight:bold;
+    border-radius:8px 8px 0 0;
   }
   #staff-chat-messages{
-    height:200px; overflow-y:auto; padding:10px; font-size:0.9rem;
-    display:flex; flex-direction:column; gap:5px;
+    height:calc(100% - 120px); 
+    overflow-y:auto; 
+    padding:10px; 
+    font-size:0.9rem;
+    display:flex; 
+    flex-direction:column; 
+    gap:5px;
   }
   .chat-message{
-    background:rgba(255,255,255,0.1); padding:5px 8px; border-radius:5px;
+    background:rgba(255,255,255,0.1); 
+    padding:8px 10px; 
+    border-radius:5px;
     border-left:3px solid var(--ars-gold);
   }
+  .chat-message strong{
+    color:var(--ars-gold);
+  }
   .chat-message small{
-    display:block; font-size:0.7rem; color:#ccc; margin-top:2px;
+    display:block; 
+    font-size:0.7rem; 
+    color:#ccc; 
+    margin-top:2px;
   }
   #staff-chat-container > div:last-child{
-    padding:10px; display:flex; gap:5px; border-top:1px solid #333;
+    padding:10px; 
+    display:flex; 
+    gap:5px; 
+    border-top:1px solid #333;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.8);
+    border-radius: 0 0 8px 8px;
   }
   #staff-chat-input{
-    flex:1; padding:5px; border-radius:5px; border:1px solid #555; background:#222; color:white;
+    flex:1; 
+    padding:8px; 
+    border-radius:5px; 
+    border:1px solid #555; 
+    background:#222; 
+    color:white;
   }
   #staff-chat-send{
-    padding:5px 10px; background:var(--ars-red); color:white; border:none; border-radius:5px; cursor:pointer;
+    padding:8px 15px; 
+    background:var(--ars-red); 
+    color:white; 
+    border:none; 
+    border-radius:5px; 
+    cursor:pointer;
+    font-weight: bold;
   }
   #staff-chat-send:hover{background:var(--ars-gold)}
 
@@ -166,7 +214,7 @@
     <button id="logoutBtn" class="hidden" onclick="doStaffLogout()">Logout</button>
   </div>
 
-  <!-- Staff Chat (hidden by default) -->
+  <!-- Staff Chat (hidden by default, shown via JavaScript on home page) -->
   <div id="staff-chat-container" class="hidden">
     <div>
       <strong>Staff Chat</strong>
@@ -181,8 +229,8 @@
 
   <!-- NAV -->
   <div class="nav-center">
-    <div class="nav-box about" role="button" onclick="showSection('about')">About Me</div>
-    <div class="nav-box leaderboards" role="button" onclick="showSection('leaderboards')">Leaderboards</div>
+    <div class="nav-box about" role="button">About Me</div>
+    <div class="nav-box leaderboards" role="button">Leaderboards</div>
   </div>
 
   <!-- LEFT SOCIAL CIRCLES -->
@@ -193,7 +241,7 @@
     </a>
     <!-- TikTok -->
     <a class="social" href="https://www.tiktok.com/@thatlegendjack" target="_blank" aria-label="TikTok" id="social-tiktok">
-      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height"256" rx="50" fill="#000"/><path d="M170 56c10 13 23 22 38 24v28c-15-1-29-6-40-14v60c0 35-28 64-64 64s-64-29-64-64 29-64 64-64s64 29 64 64V56h30z" fill="#25F4EE"/><path d="M168 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
+      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#000"/><path d="M170 56c10 13 23 22 38 24v28c-15-1-29-6-40-14v60c0 35-28 64-64 64s-64-29-64-64 29-64 64-64s64 29 64 64V56h30z" fill="#25F4EE"/><path d="M168 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
     </a>
     <!-- Kick -->
     <a class="social" href="https://kick.com/ThatLegendJackk" target="_blank" aria-label="Kick" id="social-kick">
@@ -233,27 +281,27 @@
         <input id="social-tiktok-url" placeholder="TikTok URL" style="flex:1"/>
         <input id="social-kick-url" placeholder="Kick URL" style="flex:1"/>
         <input id="social-onlyfans-url" placeholder="OnlyFans URL" style="flex:1"/>
-        <button onclick="updateSocialLinks()">Update Social Links</button>
+        <button>Update Social Links</button>
       </div>
     </div>
   </section>
 
   <!-- ABOUT -->
   <section id="about" class="hidden">
-    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <button class="back-btn">Go back</button>
     <div class="surface surface-about">
       <h2>About Me</h2>
       <div id="about-box" contenteditable="false">Loading...</div>
       <div id="about-save-row" class="row hidden" style="margin-top:.6rem">
-        <button onclick="saveAbout()">Save About</button>
-        <button style="background:#444" onclick="toggleAboutEdit(false)">Cancel</button>
+        <button>Save About</button>
+        <button style="background:#444">Cancel</button>
       </div>
     </div>
   </section>
 
   <!-- LEADERBOARDS -->
   <section id="leaderboards" class="hidden">
-    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <button class="back-btn">Go back</button>
     <div class="surface surface-leader">
       <h2>Leaderboards</h2>
       <div class="grid">
@@ -262,7 +310,7 @@
           <div class="row" style="align-items:center">
             <label>Count:</label>
             <input id="bits_count" type="number" min="1" max="10" value="10" style="max-width:100px"/>
-            <button id="bits_refresh_btn" onclick="refreshBits()">Refresh</button>
+            <button id="bits_refresh_btn">Refresh</button>
           </div>
           <div id="bits-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No data yet.</div>
         </div>
@@ -274,19 +322,14 @@
             <div class="row">
               <input id="sub_user" placeholder="Username"/>
               <input id="sub_gifts" type="number" min="0" placeholder="Gifted count"/>
-              <button id="subs_add_btn" onclick="addOrUpdateSub()">Add/Update</button>
+              <button id="subs_add_btn">Add/Update</button>
             </div>
             <div class="row">
-              <button id="subs_reset_btn" style="background:#444" onclick="resetSubs()">Reset Subs List</button>
+              <button id="subs_reset_btn" style="background:#444">Reset Subs List</button>
             </div>
           </div>
         </div>
       </div>
-
-      <details style="margin-top:1rem">
-        <summary style="cursor:pointer;font-weight:800">Twitch API Information</summary>
-        <p style="margin:.25rem 0 .6rem 0">Twitch credentials are now configured on the server.</p>
-      </details>
     </div>
   </section>
 
