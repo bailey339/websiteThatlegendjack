@@ -124,7 +124,7 @@
   }
   #staff-chat-send:hover{background:var(--ars-gold)}
 
-  /* Partnered Servers Styles */
+  /* Partnered Servers Styles with Images */
   .server-card {
     background: rgba(255,255,255,0.1);
     border-radius: 12px;
@@ -132,9 +132,30 @@
     margin-bottom: 1rem;
     border: 1px solid rgba(255,255,255,0.2);
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: 1.5rem;
+  }
+  .server-image {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid var(--ars-gold);
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .server-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .no-image {
+    color: #ccc;
+    font-size: 0.8rem;
+    text-align: center;
   }
   .server-info {
     flex: 1;
