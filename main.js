@@ -347,6 +347,9 @@ function renderPartneredServers(servers) {
   
   const html = servers.map(server => `
     <div class="server-card">
+      <div class="server-image">
+        ${server.image ? `<img src="${server.image}" alt="${server.name}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/80x80/9C824A/FFFFFF?text=Error'">` : '<div class="no-image">No Image</div>'}
+      </div>
       <div class="server-info">
         <h4>${server.name}</h4>
         <p>${server.description}</p>
