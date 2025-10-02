@@ -268,7 +268,7 @@ app.get('/api/partnered-servers', (req, res) => {
 /* ---------- Spotify OAuth (Server-wide) ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback').trim();
+const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || `${process.env.BASE_URL || 'https://thatlegendjack.onrender.com'}/auth/spotify/callback`).trim();
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -331,7 +331,7 @@ async function refreshSpotifyToken(refresh_token) {
     const tokenData = await response.json();
     await saveSpotifyToken(
       tokenData.access_token,
-      tokenData.refresh_token || refresh_token, // Use new refresh token if provided, otherwise keep old one
+      tokenData.refresh_token || refresh_token,
       tokenData.expires_in
     );
     
@@ -370,7 +370,7 @@ async function ensureValidSpotifyToken() {
 // Spotify authentication routes
 app.get('/auth/spotify/login', (req, res) => {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-    return res.status(500).send('Spotify credentials missing');
+    return res.status(500).send('Spotify credentials missing from server environment');
   }
   
   const state = Math.random().toString(36).slice(2);
@@ -413,7 +413,8 @@ app.get('/auth/spotify/callback', async (req, res) => {
     });
     
     if (!response.ok) {
-      throw new Error(`Spotify token error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Spotify token error: ${response.status} - ${errorText}`);
     }
     
     const tokenData = await response.json();
@@ -517,25 +518,7 @@ app.get('/api/spotify/now-playing', async (req, res) => {
     }
     
     if (!response.ok) {
-      // If we get 401, token might be invalid, try to refresh
-      if (response.status === 401) {
-        const token = await getSpotifyToken();
-        if (token) {
-          const newAccessToken = await refreshSpotifyToken(token.refresh_token);
-          if (newAccessToken) {
-            // Retry with new token
-            const retryResponse = await fetch(NOW_PLAYING_URL, { 
-              headers: { Authorization: `Bearer ${newAccessToken}` } 
-            });
-            
-            if (retryResponse.ok) {
-              return res.json(await retryResponse.json());
-            }
-          }
-        }
-        return res.status(401).json({ error: 'not_connected' });
-      }
-      return res.status(response.status).json({ error: 'spotify_error' });
+      return res.status(401).json({ error: 'not_connected' });
     }
     
     const data = await response.json();
@@ -616,4 +599,4 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server on :' + PORT));
+app.listen(PORT, () => console.log('Server running on port:' + PORT));
