@@ -38,6 +38,14 @@ async function initDatabase() {
       gifts INTEGER DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    
+    CREATE TABLE IF NOT EXISTS spotify_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   
   console.log('Database initialized');
@@ -257,7 +265,7 @@ app.get('/api/partnered-servers', (req, res) => {
   }
 });
 
-/* ---------- Spotify OAuth ---------- */
+/* ---------- Spotify OAuth (Server-wide) ---------- */
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
 const SPOTIFY_REDIRECT_URI = (process.env.SPOTIFY_REDIRECT_URI || 'https://thatlegendjack.onrender.com/auth/spotify/callback').trim();
@@ -266,7 +274,108 @@ const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const NOW_PLAYING_URL = 'https://api.spotify.com/v1/me/player/currently-playing';
 
-function authUrl(state) {
+// Get current Spotify token from database
+async function getSpotifyToken() {
+  try {
+    const token = await db.get(
+      'SELECT access_token, refresh_token, expires_at FROM spotify_tokens ORDER BY id DESC LIMIT 1'
+    );
+    return token;
+  } catch (error) {
+    console.error('Error getting Spotify token:', error);
+    return null;
+  }
+}
+
+// Save Spotify token to database
+async function saveSpotifyToken(access_token, refresh_token, expires_in) {
+  try {
+    const expires_at = new Date(Date.now() + (expires_in * 1000)).toISOString();
+    
+    // Delete old tokens
+    await db.run('DELETE FROM spotify_tokens');
+    
+    // Insert new token
+    await db.run(
+      'INSERT INTO spotify_tokens (access_token, refresh_token, expires_at) VALUES (?, ?, ?)',
+      [access_token, refresh_token, expires_at]
+    );
+    
+    console.log('Spotify token saved to database');
+  } catch (error) {
+    console.error('Error saving Spotify token:', error);
+  }
+}
+
+// Refresh Spotify token if expired
+async function refreshSpotifyToken(refresh_token) {
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refresh_token
+    });
+    
+    const response = await fetch(SPOTIFY_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: body
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Token refresh failed: ${response.status}`);
+    }
+    
+    const tokenData = await response.json();
+    await saveSpotifyToken(
+      tokenData.access_token,
+      tokenData.refresh_token || refresh_token, // Use new refresh token if provided, otherwise keep old one
+      tokenData.expires_in
+    );
+    
+    return tokenData.access_token;
+  } catch (error) {
+    console.error('Error refreshing Spotify token:', error);
+    return null;
+  }
+}
+
+// Ensure we have a valid access token
+async function ensureValidSpotifyToken() {
+  try {
+    const token = await getSpotifyToken();
+    
+    if (!token) {
+      return null; // No token available
+    }
+    
+    // Check if token is expired (with 1 minute buffer)
+    const isExpired = new Date(token.expires_at) < new Date(Date.now() + 60000);
+    
+    if (isExpired) {
+      console.log('Spotify token expired, refreshing...');
+      const newAccessToken = await refreshSpotifyToken(token.refresh_token);
+      return newAccessToken;
+    }
+    
+    return token.access_token;
+  } catch (error) {
+    console.error('Error ensuring valid Spotify token:', error);
+    return null;
+  }
+}
+
+// Spotify authentication routes
+app.get('/auth/spotify/login', (req, res) => {
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    return res.status(500).send('Spotify credentials missing');
+  }
+  
+  const state = Math.random().toString(36).slice(2);
+  req.session.spotify_state = state;
+  
   const scope = 'user-read-currently-playing user-read-playback-state';
   const q = new URLSearchParams({
     response_type: 'code',
@@ -276,20 +385,13 @@ function authUrl(state) {
     state: state,
     show_dialog: 'false'
   });
-  return `${SPOTIFY_AUTH_URL}?${q}`;
-}
-
-app.get('/auth/spotify/login', (req, res) => {
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-    return res.status(500).send('Spotify credentials missing');
-  }
-  const state = Math.random().toString(36).slice(2);
-  req.session.spotify_state = state;
-  res.redirect(authUrl(state));
+  
+  res.redirect(`${SPOTIFY_AUTH_URL}?${q}`);
 });
 
 app.get('/auth/spotify/callback', async (req, res) => {
   const { code, state } = req.query;
+  
   if (!code || !state || state !== req.session.spotify_state) {
     return res.status(400).send('Invalid state parameter');
   }
@@ -315,54 +417,93 @@ app.get('/auth/spotify/callback', async (req, res) => {
     }
     
     const tokenData = await response.json();
-    req.session.spotify = {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_at: Date.now() + (tokenData.expires_in * 1000)
-    };
     
-    res.redirect('/');
+    // Save token to database (shared for all users)
+    await saveSpotifyToken(
+      tokenData.access_token,
+      tokenData.refresh_token,
+      tokenData.expires_in
+    );
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Spotify Connected</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1DB954; color: white; }
+          .message { background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; display: inline-block; }
+        </style>
+      </head>
+      <body>
+        <div class="message">
+          <h1>✅ Spotify Connected Successfully!</h1>
+          <p>The Spotify connection is now active for everyone visiting the site.</p>
+          <p>You can close this window and return to the stream.</p>
+          <button onclick="window.close()" style="padding: 10px 20px; background: #191414; color: white; border: none; border-radius: 5px; cursor: pointer;">Close Window</button>
+        </div>
+      </body>
+      </html>
+    `);
+    
   } catch (error) {
     console.error('Spotify callback error:', error);
-    res.status(500).send('Authentication failed');
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Spotify Connection Failed</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #EF0107; color: white; }
+          .message { background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; display: inline-block; }
+        </style>
+      </head>
+      <body>
+        <div class="message">
+          <h1>❌ Spotify Connection Failed</h1>
+          <p>There was an error connecting to Spotify. Please try again.</p>
+          <p>Error: ${error.message}</p>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });
 
-async function ensureSpotifyAccessToken(sess) {
-  if (!sess?.spotify?.refresh_token) return null;
-  if (sess.spotify.access_token && Date.now() < (sess.spotify.expires_at || 0)) return sess.spotify.access_token;
+// Check Spotify connection status
+app.get('/api/spotify/status', async (req, res) => {
+  try {
+    const token = await getSpotifyToken();
+    const isConnected = !!(token && new Date(token.expires_at) > new Date());
+    
+    res.json({
+      connected: isConnected,
+      expires_at: token?.expires_at || null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: sess.spotify.refresh_token
-  });
-  
-  const response = await fetch(SPOTIFY_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64'),
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: body
-  });
-  
-  if (!response.ok) { 
-    sess.spotify = null; 
-    return null; 
+// Disconnect Spotify (staff only)
+app.delete('/api/spotify/disconnect', async (req, res) => {
+  if (!req.session.staff?.loggedIn) {
+    return res.status(401).json({ error: 'Not authorized' });
   }
   
-  const tokenData = await response.json();
-  sess.spotify = {
-    access_token: tokenData.access_token,
-    refresh_token: sess.spotify.refresh_token,
-    expires_at: Date.now() + (tokenData.expires_in * 1000)
-  };
-  return sess.spotify.access_token;
-}
+  try {
+    await db.run('DELETE FROM spotify_tokens');
+    res.json({ success: true, message: 'Spotify disconnected' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
+// Now playing endpoint (shared for all users)
 app.get('/api/spotify/now-playing', async (req, res) => {
   try {
-    const accessToken = await ensureSpotifyAccessToken(req.session);
+    const accessToken = await ensureValidSpotifyToken();
+    
     if (!accessToken) {
       return res.status(401).json({ error: 'not_connected' });
     }
@@ -371,11 +512,37 @@ app.get('/api/spotify/now-playing', async (req, res) => {
       headers: { Authorization: `Bearer ${accessToken}` } 
     });
     
-    if (response.status === 204) return res.json({ playing: false });
-    if (!response.ok) return res.status(response.status).json({ error: 'spotify_error' });
+    if (response.status === 204) {
+      return res.json({ playing: false });
+    }
     
-    res.json(await response.json());
+    if (!response.ok) {
+      // If we get 401, token might be invalid, try to refresh
+      if (response.status === 401) {
+        const token = await getSpotifyToken();
+        if (token) {
+          const newAccessToken = await refreshSpotifyToken(token.refresh_token);
+          if (newAccessToken) {
+            // Retry with new token
+            const retryResponse = await fetch(NOW_PLAYING_URL, { 
+              headers: { Authorization: `Bearer ${newAccessToken}` } 
+            });
+            
+            if (retryResponse.ok) {
+              return res.json(await retryResponse.json());
+            }
+          }
+        }
+        return res.status(401).json({ error: 'not_connected' });
+      }
+      return res.status(response.status).json({ error: 'spotify_error' });
+    }
+    
+    const data = await response.json();
+    res.json(data);
+    
   } catch (error) {
+    console.error('Spotify now-playing error:', error);
     res.status(500).json({ error: error.message });
   }
 });
