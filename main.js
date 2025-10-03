@@ -122,11 +122,15 @@ function applyStaffUI() {
       spotifyControls.innerHTML = `
         <h4>Spotify Controls</h4>
         <div class="row">
-          <button onclick="connectSpotify()" class="spotify-btn">Connect Spotify</button>
-          <button onclick="disconnectSpotify()" style="background: #444;">Disconnect Spotify</button>
+          <button id="connect-spotify-btn" class="spotify-btn">Connect Spotify</button>
+          <button id="disconnect-spotify-btn" style="background: #444;">Disconnect Spotify</button>
         </div>
       `;
       adminControls.appendChild(spotifyControls);
+      
+      // Add event listeners for the new buttons
+      document.getElementById('connect-spotify-btn').addEventListener('click', connectSpotify);
+      document.getElementById('disconnect-spotify-btn').addEventListener('click', disconnectSpotify);
     }
   });
   
@@ -515,10 +519,12 @@ async function loadDiscordConfig(){
     const cfg = await fetch('/api/config').then(r => r.json());
     DISCORD_USER_ID = cfg?.discord_user_id || '';
     
+    const discordStatus = $('#discord-status');
+    
     if (DISCORD_USER_ID) {
+      if (discordStatus) discordStatus.textContent = 'Discord: Loading...';
       connectLanyard();
     } else {
-      const discordStatus = $('#discord-status');
       if (discordStatus) discordStatus.textContent = 'Discord: Not Configured';
     }
   }catch(e){ 
@@ -563,7 +569,9 @@ function connectLanyard(){
         const statusEl = $('#discord-status');
         if (statusEl) {
           if (spotifyActivity) {
-            statusEl.textContent = `Discord: Listening to Spotify`;
+            const track = spotifyActivity.details || 'Unknown Track';
+            const artist = spotifyActivity.state || 'Unknown Artist';
+            statusEl.textContent = `Listening: ${track} - ${artist}`;
           } else {
             statusEl.textContent = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
           }
@@ -597,32 +605,16 @@ async function updateSpotify(){
     const r = await fetch('/api/spotify/now-playing');
     
     if (r.status === 401) {
-      // Check if Spotify is connected at all
-      try {
-        const statusResponse = await fetch('/api/spotify/status');
-        const status = await statusResponse.json();
-        
-        if (!status.connected) {
-          el.textContent = 'Spotify: Not Connected';
-          el.title = 'Staff can connect Spotify in admin controls';
-          el.classList.remove('scrolling');
-        } else {
-          el.textContent = 'Spotify: Not Playing';
-          el.title = 'Spotify: Not Playing';
-          el.classList.remove('scrolling');
-        }
-      } catch {
-        el.textContent = 'Spotify: Not Connected';
-        el.title = 'Staff can connect Spotify in admin controls';
-        el.classList.remove('scrolling');
-      }
+      el.textContent = 'Spotify: Not Connected';
+      el.title = 'Staff can connect Spotify in admin controls';
+      el.classList.remove('scrolling');
       return;
     }
     
     if (r.ok) {
       const data = await r.json();
       
-      if (data.error === 'not_connected' || !data || data.playing === false || !data.item) {
+      if (!data || data.playing === false || !data.item) {
         el.textContent = 'Spotify: Not Playing';
         el.title = 'Spotify: Not Playing';
         el.classList.remove('scrolling');
@@ -641,8 +633,8 @@ async function updateSpotify(){
         }
       }
     } else {
-      el.textContent = 'Spotify: API Error';
-      el.title = 'Spotify: API Error';
+      el.textContent = 'Spotify: Error';
+      el.title = 'Spotify: Error';
       el.classList.remove('scrolling');
     }
   } catch (error) {
@@ -738,7 +730,7 @@ function bindEvents() {
   
   // Social links update button
   const socialUpdateBtn = document.querySelector('#admin-controls button');
-  if (socialUpdateBtn) {
+  if (socialUpdateBtn && !socialUpdateBtn.id) {
     socialUpdateBtn.addEventListener('click', function(e) {
       e.preventDefault();
       updateSocialLinks();
