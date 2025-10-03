@@ -564,17 +564,19 @@ function connectLanyard(){
       if (data.t === 'INIT_STATE' || data.t === 'PRESENCE_UPDATE') {
         const status = data.d?.discord_status || 'offline';
         const activities = data.d?.activities || [];
-        const spotifyActivity = activities.find(activity => activity.name === 'Spotify');
         
         const statusEl = $('#discord-status');
         if (statusEl) {
-          if (spotifyActivity) {
-            const track = spotifyActivity.details || 'Unknown Track';
-            const artist = spotifyActivity.state || 'Unknown Artist';
-            statusEl.textContent = `Listening: ${track} - ${artist}`;
-          } else {
-            statusEl.textContent = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+          // Only show Discord status, NOT Spotify info
+          let statusText = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+          
+          // Add custom status if available
+          const customStatus = activities.find(a => a.type === 4);
+          if (customStatus && customStatus.state) {
+            statusText += ` - ${customStatus.state}`;
           }
+          
+          statusEl.textContent = statusText;
         }
       }
     }catch(e){
