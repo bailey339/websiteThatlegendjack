@@ -650,6 +650,30 @@ async function updateSpotify(){
   spotifyTimer = setTimeout(updateSpotify, 10000);
 }
 
+// Test function to manually check Spotify status
+async function testSpotify() {
+  console.log('Testing Spotify connection...');
+  try {
+    const response = await fetch('/api/spotify/now-playing');
+    console.log('Spotify response status:', response.status);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Spotify data:', data);
+      
+      if (data && data.item) {
+        console.log('Now playing:', data.item.name, '-', data.item.artists.map(a => a.name).join(', '));
+      } else {
+        console.log('Spotify not playing or no data');
+      }
+    } else {
+      console.log('Spotify API error:', response.status);
+    }
+  } catch (error) {
+    console.log('Spotify test error:', error);
+  }
+}
+
 // Spotify control functions
 function connectSpotify() {
   window.open('/auth/spotify/login', '_blank');
