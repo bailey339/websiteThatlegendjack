@@ -4,208 +4,231 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ThatLegendJack</title>
+
+<!-- libs -->
+<script src="https://cdn.jsdelivr.net/npm/tsparticles@3/tsparticles.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://embed.twitch.tv/embed/v1.js"></script>
+
 <style>
+/* ====== MERGED EXTERNAL CSS ====== */
+:root{
+  --ars-red:#EF0107; --ars-white:#FFF; --ars-navy:#063672; --ars-gold:#9C824A;
+  --bgA: rgba(0,0,0,.35); --glass: rgba(20,20,28,.35);
+  --txt:#fff; --muted:rgba(255,255,255,.75);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; color:var(--txt); text-align:center; font-family: Inter, system-ui, Arial, Helvetica, sans-serif;
+  background: radial-gradient(1200px 1200px at 10% -10%, #ff6b6b20, transparent 50%),
+              radial-gradient(1000px 1000px at 110% 10%, #6bcbff20, transparent 50%),
+              linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
+  background-size: 160% 160%;
+  animation: bgShift 18s ease-in-out infinite;
+  overflow-x:hidden;
+}
+@keyframes bgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+h1{
+  margin:1rem 0 0; font-size:clamp(2rem,5vw,3rem); font-weight:900;
+  background:linear-gradient(270deg,#EF0107,#FFFFFF,#063672,#EF0107);
+  background-size:600% 600%;
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; -webkit-text-stroke:2px #000;
+  animation:gradientShift 8s ease infinite;
+  text-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+.hidden{display:none}
+section{padding:1rem}
+
+/* Top-right controls */
+.login-container{
+  position:fixed;top:10px;right:20px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
+  padding:10px;border-radius:12px;z-index:50;display:flex;gap:.5rem;align-items:center}
+.btn{padding:.6rem 1rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;color:#fff;
+     box-shadow:0 6px 14px rgba(0,0,0,.25);transition:transform .12s ease,filter .12s ease}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.btn-primary{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
+.btn-secondary{background:linear-gradient(135deg,#111,#333)}
+
+/* Sub-nav */
+.nav-center{margin:1rem auto 0;display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}
+.nav-box{display:block;min-width:150px;padding:.9rem 1.6rem;font-weight:800;color:#fff;text-decoration:none;border-radius:14px;
+  box-shadow:0 10px 24px rgba(0,0,0,.3);cursor:pointer;transition:transform .15s,box-shadow .15s;
+  border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px)}
+.nav-box:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(0,0,0,.35)}
+.about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
+.leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
+.partners{background:linear-gradient(135deg,#6bcbff,#063672)}
+
+/* Surfaces */
+.surface{max-width:1100px;margin:1rem auto;padding:1.2rem;border-radius:16px;text-align:left;
+  border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 28px rgba(0,0,0,.28);background:var(--glass)}
+.surface-leader{background:linear-gradient(135deg,rgba(6,54,114,.55),rgba(255,255,255,.25))}
+.surface-partners{background:linear-gradient(135deg,rgba(107,203,255,.4),rgba(6,54,114,.5))}
+
+/* Two-column layout (Bits left, Subs right) */
+.lb-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:1.25rem;
+  align-items:start;
+}
+@media(max-width:760px){ .lb-grid{ grid-template-columns:1fr; } }
+
+.card{border-radius:12px;padding:1rem;background:transparent;border:1px solid rgba(255,255,255,.25);box-shadow:0 8px 18px rgba(0,0,0,.25)}
+.scroll-area{
+  min-height:220px;
+  background:rgba(255,255,255,.08);
+  border-radius:8px;
+  padding:.5rem;
+  overflow:auto;
+}
+.lb-header{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between}
+
+/* List styling */
+.lb-list{list-style:none;margin:0;padding:0}
+.lb-list li{
+  display:flex; gap:.6rem; align-items:center;
+  padding:.45rem .6rem;
+  border-bottom:1px solid rgba(255,255,255,.15);
+}
+.lb-list li:last-child{border-bottom:none}
+.rank{opacity:.65; width:2.2rem; text-align:right}
+.name{font-weight:700; flex:1; text-align:left}
+.value{opacity:.9}
+.muted{opacity:.7}
+
+/* Partners */
+.partner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem}
+.partner-card{background:rgba(0,0,0,.4);border-radius:12px;padding:1rem;text-align:center;border:1px solid rgba(255,255,255,.2)}
+.partner-logo{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;margin-bottom:.5rem}
+.partner-card a{color:#1DB954;text-decoration:none;font-weight:600;display:inline-block;margin-top:.4rem}
+
+/* Forms */
+.row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.45rem 0}
+.row input,.row select,.row button{padding:.5rem;border:none;border-radius:8px}
+.row input,.row select{flex:1;min-width:120px}
+form{max-width:520px;margin:1rem auto;background:var(--bgA);padding:1rem;border-radius:12px}
+form input{display:block;width:100%;margin:.5rem 0;padding:.6rem;border:none;border-radius:8px}
+form button{padding:.6rem 1rem;border:none;border-radius:8px;background:var(--ars-red);color:#fff;font-weight:800;cursor:pointer}
+form button:hover{background:var(--ars-gold)}
+
+/* ====== ORIGINAL THEME / LAYOUT CSS (KEPT AFTER TO TAKE PRIORITY) ====== */
   :root{ --ars-red:#EF0107; --ars-white:#FFF; --ars-navy:#063672; --ars-gold:#9C824A; }
   *{box-sizing:border-box}
+
+  /* ===== Background (RGB default) ===== */
   body{
     margin:0; font-family:Arial,Helvetica,sans-serif; color:#fff; text-align:center;
-    background:linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
+    background:
+      radial-gradient(1200px 1200px at 10% -10%, #ff6b6b20, transparent 50%),
+      radial-gradient(1000px 1000px at 110% 10%, #6bcbff20, transparent 50%),
+      linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
+    background-size:160% 160%;
+    animation:bgShift 18s ease-in-out infinite;
   }
+  @keyframes bgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+  /* Colour-mode variants (background only) */
+  body.theme-dark{ background:#0f1115; animation:none; color:#fff; }
+  body.theme-light{ background:#f5f7fb; animation:none; color:#111; }
+  body.theme-rgb{
+    background:
+      radial-gradient(1200px 1200px at 10% -10%, #ff6b6b20, transparent 50%),
+      radial-gradient(1000px 1000px at 110% 10%, #6bcbff20, transparent 50%),
+      linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
+    background-size:160% 160%;
+    animation:bgShift 18s ease-in-out infinite;
+    color:#fff;
+  }
+
+  /* Seasonal themes (background only) */
+  body.theme-christmas{
+    background:
+      radial-gradient(1000px 1000px at 10% -10%, #2ecc7022, transparent 50%),
+      radial-gradient(900px 900px at 110% 20%, #e74c3c22, transparent 50%),
+      linear-gradient(135deg,#0f3d27 0%,#b71c1c 50%,#0f3d27 100%);
+    animation:none; color:#fff;
+  }
+  body.theme-halloween{
+    background:
+      radial-gradient(1000px 1000px at -10% 20%, #ff9f1c22, transparent 55%),
+      radial-gradient(900px 900px at 120% -10%, #ff6b6b22, transparent 55%),
+      linear-gradient(135deg,#0b0b0b 0%,#ff6a00 50%,#2d0052 100%);
+    animation:none; color:#fff;
+  }
+  body.theme-easter{
+    background:
+      radial-gradient(1000px 1000px at 0% 0%, #ffccd522, transparent 55%),
+      radial-gradient(900px 900px at 100% 0%, #c8e6ff22, transparent 55%),
+      linear-gradient(135deg,#f8e8ff 0%,#e1f7ff 50%,#fff7e1 100%);
+    animation:none; color:#1a1a1a;
+  }
+
   h1{
-    margin:1rem 0 0; font-size:2.8rem; font-weight:900; text-shadow:2px 2px 5px #000;
+    margin:1rem 0 0; font-size:2.8rem; font-weight:900;
     background:linear-gradient(270deg,#EF0107,#FFFFFF,#063672,#EF0107);
     background-size:600% 600%;
     -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:gradientShift 8s ease infinite;
+    -webkit-text-stroke:2px #000; text-shadow:0 6px 18px rgba(0,0,0,.35);
   }
   @keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 
-  /* Text scrolling animation - FIXED */
-  @keyframes scrollText {
-    0% { transform: translateX(100%); }
-    100% { transform: translateX(-100%); }
-  }
+  /* Layers: particles (back), decor (behind content) */
+  #particles{position:fixed;inset:0;z-index:-2}
+  #decor-layer{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
 
   .hidden{display:none}
   section{padding:1rem}
 
-  /* Top-right auth buttons */
-  .login-container{position:fixed;top:10px;right:20px;background:rgba(0,0,0,.75);padding:10px;border-radius:10px;z-index:40}
-  .login-container button{padding:.6rem 1rem;background:var(--ars-red);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
-  .login-container button:hover{background:var(--ars-gold)}
+  /* Top-right controls (Theme + Colour mode + Login/Logout) */
+  .login-container{
+    position:fixed;top:10px;right:20px;background:rgba(0,0,0,.65);padding:10px;border-radius:10px;
+    z-index:40;display:flex;gap:.5rem
+  }
+  .login-container button{
+    padding:.6rem .95rem;background:var(--ars-red);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;
+    transition:background .15s ease
+  }
+  /* hover goes BLACK (requested) */
+  .login-container button:hover{background:#000}
 
-  /* Nav boxes */
+  /* Sub-nav */
   .nav-center{margin:1rem auto 0;display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}
   .nav-box{
     display:block;min-width:150px;padding:.9rem 1.6rem;font-weight:800;color:#fff;text-decoration:none;border-radius:12px;
-    box-shadow:2px 2px 8px rgba(0,0,0,.6);cursor:pointer; transition:.15s; border:2px solid var(--ars-white)
+    box-shadow:2px 2px 8px rgba(0,0,0,.6);cursor:pointer; transition:.15s; border:2px solid rgba(255,255,255,.7)
   }
   .nav-box:hover{transform:translateY(-3px)}
-  .home{display:none} /* Hide home button */
+  .home{background:linear-gradient(135deg,var(--ars-gold),var(--ars-red))}
   .about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
   .leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
-  .partnered{background:linear-gradient(135deg,var(--ars-gold),var(--ars-white))}
+  .partners{background:linear-gradient(135deg,#6bcbff,#063672)}
 
-  /* Staff Chat - LARGER and only on home page - PC VERSION */
-  #staff-chat-container{
-    position:fixed; 
-    top:80px; 
-    right:20px; 
-    width:calc(85% - 40px);
-    max-width:412px;
-    height:calc(85vh - 200px);
-    background:rgba(0,0,0,0.95); 
-    border-radius:10px; 
-    z-index:35; 
-    border:2px solid var(--ars-gold);
-    display: none;
-  }
-  #staff-chat-container.visible {
-    display: block;
-  }
-  #staff-chat-container > div:first-child{
-    padding:10px; 
-    border-bottom:1px solid #333; 
-    background:rgba(239,1,7,0.3);
-    font-weight:bold;
-    border-radius:8px 8px 0 0;
-  }
-  #staff-chat-messages{
-    height:calc(100% - 120px); 
-    overflow-y:auto; 
-    padding:10px; 
-    font-size:0.9rem;
-    display:flex; 
-    flex-direction:column; 
-    gap:5px;
-  }
-  .chat-message{
-    background:rgba(255,255,255,0.1); 
-    padding:8px 10px; 
-    border-radius:5px;
-    border-left:3px solid var(--ars-gold);
-  }
-  .chat-message strong{
-    color:var(--ars-gold);
-  }
-  .chat-message small{
-    display:block; 
-    font-size:0.7rem; 
-    color:#ccc; 
-    margin-top:2px;
-  }
-  #staff-chat-container > div:last-child{
-    padding:10px; 
-    display:flex; 
-    gap:5px; 
-    border-top:1px solid #333;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0,0,0,0.8);
-    border-radius: 0 0 8px 8px;
-  }
-  #staff-chat-input{
-    flex:1; 
-    padding:8px; 
-    border-radius:5px; 
-    border:1px solid #555; 
-    background:#222; 
-    color:white;
-  }
-  #staff-chat-send{
-    padding:8px 15px; 
-    background:var(--ars-red); 
-    color:white; 
-    border:none; 
-    border-radius:5px; 
-    cursor:pointer;
-    font-weight: bold;
-  }
-  #staff-chat-send:hover{background:var(--ars-gold)}
-
-  /* Partnered Servers Styles with Images */
-  .server-card {
-    background: rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    border: 1px solid rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-  }
-  .server-image {
-    flex-shrink: 0;
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 2px solid var(--ars-gold);
-    background: rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .server-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .no-image {
-    color: #ccc;
-    font-size: 0.8rem;
-    text-align: center;
-  }
-  .server-info {
-    flex: 1;
-    text-align: left;
-  }
-  .server-info h4 {
-    margin: 0 0 0.5rem 0;
-    color: #000000;
-    font-size: 1.2rem;
-    font-weight: bold;
-  }
-  .server-info p {
-    margin: 0;
-    color: #000000;
-    font-size: 0.9rem;
-  }
-  .join-btn {
-    background: var(--ars-red);
-    color: white;
-    padding: 0.7rem 1.5rem;
-    border-radius: 8px;
-    text-decoration: none;
-    font-weight: bold;
-    white-space: nowrap;
-    transition: background 0.15s;
-  }
-  .join-btn:hover {
-    background: var(--ars-gold);
-  }
-
-  /* Unified surfaces */
+  /* Surfaces */
   .surface{
-    max-width:1100px;margin:1rem auto;padding:1.2rem 1.2rem 1.4rem;
-    border-radius:16px; text-align:left; border:1px solid rgba(255,255,255,.18);
+    max-width:1200px;margin:1rem auto;padding:1.2rem 1.2rem 1.4rem;border-radius:16px;
+    text-align:left; border:1px solid rgba(255,255,255,.18);
     box-shadow:0 12px 28px rgba(0,0,0,.28);
     background:rgba(0,0,0,.35); position:relative;
   }
   .surface-about{ background:linear-gradient(135deg, rgba(239,1,7,.85), rgba(156,130,74,.85)); }
   .surface-leader{ background:linear-gradient(135deg, rgba(6,54,114,.85), rgba(255,255,255,.38)); }
-  .surface-partnered{ background:linear-gradient(135deg, rgba(156,130,74,.85), rgba(255,255,255,.38)); }
+  .surface-partners{background:linear-gradient(135deg,rgba(107,203,255,.4),rgba(6,54,114,.5))}
 
-  /* Go back (About/Leaderboards/Partnered) */
+  /* Back button */
   .back-btn{
     position:fixed; top:10px; left:20px; z-index:35;
     padding:.5rem .9rem; border:none; border-radius:10px; font-weight:800; cursor:pointer; color:#fff;
     background:linear-gradient(135deg,var(--ars-red),var(--ars-gold)); box-shadow:0 6px 14px rgba(0,0,0,.3);
   }
 
-  /* Twitch player - PC VERSION */
-  .player-wrap{max-width:1000px;margin:1rem auto 0;padding:0 1rem}
+  /* Twitch video + chat grid */
+  .player-wrap{max-width:1200px;margin:1rem auto 0;padding:0 1rem}
+  .twitch-grid{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
+  @media(max-width:900px){.twitch-grid{grid-template-columns:1fr}}
   .player-frame{position:relative;width:100%;aspect-ratio:16/9;background:#0e0e10;border:2px solid var(--ars-gold);
     border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.35)}
   #twitch-player{position:absolute;inset:0;width:100%;height:100%}
@@ -214,278 +237,165 @@
   .offline-show{opacity:1;visibility:visible}
   .offline-btn{display:inline-block;padding:.55rem .9rem;border-radius:8px;background:linear-gradient(135deg,var(--ars-red),var(--ars-gold));
     color:#fff;text-decoration:none;font-weight:800}
+  .live-pill{position:absolute;top:10px;left:10px;background:#e91916;color:#fff;padding:.25rem .55rem;border-radius:999px;font-weight:800;letter-spacing:.3px;box-shadow:0 6px 14px rgba(0,0,0,.35);display:none}
+  .chat-frame{height:100%;min-height:420px;border:2px solid rgba(255,255,255,.25);border-radius:12px;overflow:hidden;background:#0e0e10}
 
-  /* RIGHT status circles (LARGER for Spotify) */
+  /* ====== Status circles (force white text) ====== */
   .status-container{
     position:fixed; bottom:20px; right:0; z-index:30;
     display:flex; gap:1.2rem; flex-wrap:wrap; align-items:flex-end; padding-right:10px;
   }
   .circle{
-    width:220px; height:220px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:0.85rem; text-align:center; padding:20px; box-shadow:2px 2px 6px rgba(0,0,0,.6); background:#111; border:4px solid #333;
-    overflow: hidden;
+    width:160px; height:160px; border-radius:50%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:.86rem; text-align:center; padding:10px;
+    box-shadow:0 10px 24px rgba(0,0,0,.35);
+    background:#0f0f12; border:4px solid #333;
+    color:#fff;
   }
+  .circle *{ color:#fff !important; }
+  .title{opacity:.7; font-size:.8rem; margin-bottom:.2rem; color:#fff !important;}
   .spotify{border-color:#1DB954} .discord{border-color:#5865F2}
-  .track{
-    white-space: nowrap;
-    overflow: visible;
-    display: inline-block;
-    min-width: auto;
-    box-sizing: border-box;
-    padding: 0 15px;
-  }
-  .track.scrolling {
-    animation: scrollText 20s linear infinite;
-    padding: 0 25px;
-    min-width: max-content;
-  }
+  .track{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  /* LEFT social circles */
+  /* Spotify visualizer */
+  .viz{display:flex;gap:3px;align-items:flex-end;height:28px;margin-top:6px}
+  .bar{width:5px;height:8px;background:#1DB954;border-radius:2px;opacity:.95;transform-origin:bottom}
+  .album{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);padding:.5rem;border-radius:10px;display:flex;gap:.6rem;align-items:center}
+  .album img{width:48px;height:48px;border-radius:8px;border:2px solid rgba(255,255,255,.5)}
+  .glowPulse{animation:glow 1.4s ease-in-out infinite}
+  @keyframes glow{0%{box-shadow:0 0 0 0 rgba(29,185,84,.45)}100%{box-shadow:0 0 24px 10px rgba(29,185,84,0)}}
+
+  /* Social column */
   .social-stack{ position:fixed; left:20px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:16px; z-index:25; }
   .social{
     width:88px; height:88px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    background:#0f0f12; border:3px solid rgba(255,255,255,.6); box-shadow:0 6px 14px rgba(0,0,0,.35);
+    background:#0f0f12; border:3px solid rgba(255,255,255,.6); box-shadow:0 10px 24px rgba(0,0,0,.35);
     transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease; overflow:hidden; text-decoration:none;
   }
-  .social:hover{ transform:translateY(-3px); box-shadow:0 8px 18px rgba(0,0,0,.45); border-color:#fff; }
+  .social:hover{ transform:translateY(-3px); box-shadow:0 14px 28px rgba(0,0,0,.45); border-color:#fff; }
   .social svg{ width:56%; height:56%; display:block; }
 
-  /* Internals */
+  /* Grid / cards / rows */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  @media(max-width:860px){ .grid{grid-template-columns:1fr}}
   .card{ border-radius:12px; padding:1rem; background:transparent; border:1px solid rgba(255,255,255,.25); box-shadow:0 4px 14px rgba(0,0,0,.2) }
-  table{width:100%;border-collapse:collapse}
-  th,td{padding:.45rem .6rem;text-align:left;border-bottom:1px solid rgba(255,255,255,.15)}
-  .row{display:flex;gap:.5rem;margin:.45rem 0}
+  .row{display:flex;gap:.5rem;margin:.45rem 0;flex-wrap:wrap}
   .row input,.row select,.row button{padding:.5rem;border:none;border-radius:8px}
-  .row input,.row select{flex:1}
+  .row input,.row select{flex:1;min-width:120px}
   .row button{background:var(--ars-red);color:#fff;font-weight:700;cursor:pointer}
 
-  /* form styles reused on login.html */
+  /* Forms */
   form{max-width:420px;margin:1rem auto;background:rgba(0,0,0,.35);padding:1rem;border-radius:12px}
   form input{display:block;width:100%;margin:.5rem 0;padding:.6rem;border:none;border-radius:8px}
   form button{padding:.6rem 1rem;border:none;border-radius:8px;background:var(--ars-red);color:#fff;font-weight:800;cursor:pointer}
-  form button:hover{background:var(--ars-gold)}
+  form button:hover{background:#000}
 
+  .flash{animation:flash .6s ease}
+  @keyframes flash{0%{background:rgba(255,255,255,.15)}100%{background:transparent}}
+  .badge{display:inline-block;padding:.15rem .35rem;border-radius:.4rem;font-size:.72rem;margin-left:.35rem;background:#ffcd1f;color:#1a1a1a;font-weight:800}
   .spotify-btn{padding:.7rem 1.1rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;color:#fff;background:linear-gradient(135deg,#1DB954,#15803d)}
 
-  /* MOBILE ONLY STYLES */
-  @media (max-width: 768px) {
-    h1 {
-      font-size: 2rem;
-      padding: 0 1rem;
-    }
-    
-    .login-container {
-      right: 10px;
-      padding: 8px;
-    }
-    
-    .login-container button {
-      padding: .5rem .8rem;
-      font-size: 0.9rem;
-    }
-    
-    .nav-center {
-      gap: 0.8rem;
-      padding: 0 1rem;
-    }
-    
-    .nav-box {
-      min-width: 120px;
-      padding: .7rem 1.2rem;
-      font-size: 0.9rem;
-    }
-    
-    /* Mobile Staff Chat - Smaller */
-    #staff-chat-container {
-      position: fixed;
-      top: 70px;
-      right: 10px;
-      left: 10px;
-      width: auto;
-      height: 300px;
-      max-width: 350px;
-      margin: 0 auto;
-    }
-    
-    #staff-chat-container > div:first-child {
-      padding: 8px;
-      font-size: 0.9rem;
-    }
-    
-    #staff-chat-messages {
-      padding: 8px;
-      font-size: 0.8rem;
-      height: calc(100% - 100px);
-    }
-    
-    #staff-chat-input {
-      padding: 6px;
-      font-size: 0.8rem;
-    }
-    
-    #staff-chat-send {
-      padding: 6px 12px;
-      font-size: 0.8rem;
-    }
-    
-    .social-stack {
-      left: 10px;
-      gap: 12px;
-    }
-    
-    .social {
-      width: 60px;
-      height: 60px;
-    }
-    
-    .status-container {
-      bottom: 10px;
-      right: 10px;
-      gap: 0.8rem;
-    }
-    
-    .circle {
-      width: 150px;
-      height: 150px;
-      font-size: 0.7rem;
-      padding: 15px;
-    }
-    
-    /* Mobile Twitch Player - Smaller */
-    .player-wrap {
-      max-width: 95%;
-      padding: 0 0.5rem;
-    }
-    
-    .player-frame {
-      border-radius: 10px;
-    }
-    
-    .surface {
-      max-width: 95%;
-      padding: 1rem;
-    }
-    
-    .server-card {
-      padding: 1rem;
-      gap: 1rem;
-    }
-    
-    .server-image {
-      width: 60px;
-      height: 60px;
-    }
-    
-    .server-info h4 {
-      font-size: 1rem;
-    }
-    
-    .server-info p {
-      font-size: 0.8rem;
-    }
-    
-    .join-btn {
-      padding: 0.5rem 1rem;
-      font-size: 0.8rem;
-    }
-    
-    .grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    
-    .back-btn {
-      left: 10px;
-      padding: .4rem .7rem;
-      font-size: 0.8rem;
-    }
-  }
+  /* ====== DECORATIONS (seasonal emojis) ====== */
+  .decor-item{position:absolute; will-change:transform, opacity; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35));}
+  .spin{ animation:spin 10s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg) } }
+  @keyframes driftR{ from{ transform:translateX(-15vw) translateY(0)} to{ transform:translateX(115vw) translateY(0)} }
+  @keyframes driftL{ from{ transform:translateX(115vw) translateY(0)} to{ transform:translateX(-15vw) translateY(0)} }
+  @keyframes bob  { 0%{ transform:translateY(0)} 50%{ transform:translateY(-12px)} 100%{ transform:translateY(0)} }
+  @keyframes wiggle { 0%{ transform:rotate(-6deg)} 50%{ transform:rotate(6deg)} 100%{ transform:rotate(-6deg)} }
+  @keyframes fall  { from{ transform:translateY(-10vh)} to{ transform:translateY(110vh)} }
+  @keyframes sway  { 0%{ transform:translateX(-12px)} 50%{ transform:translateX(12px)} 100%{ transform:translateX(-12px)} }
+  .drift-right{ animation:driftR linear infinite; }
+  .drift-left { animation:driftL linear infinite; }
+  .bob       { animation:bob 3.6s ease-in-out infinite; }
+  .wiggle    { animation:wiggle 2.4s ease-in-out infinite; }
+  .flake     { animation:fall linear infinite, sway ease-in-out infinite; opacity:.95; }
 
-  @media (max-width: 480px) {
-    .server-card {
-      flex-direction: column;
-      text-align: center;
-      gap: 0.8rem;
-    }
-    
-    .server-info {
-      text-align: center;
-    }
-    
-    .social-stack {
-      left: 5px;
-      gap: 8px;
-    }
-    
-    .social {
-      width: 50px;
-      height: 50px;
-    }
-    
-    .status-container {
-      bottom: 5px;
-      right: 5px;
-      gap: 0.5rem;
-    }
-    
-    .circle {
-      width: 130px;
-      height: 130px;
-      font-size: 0.65rem;
-    }
-    
-    .track {
-      font-size: 0.65rem;
-    }
+  /* ===== Partnered servers form & cards ===== */
+  .partner-form-bar{
+    margin:.75rem 0 0 0;
+    background:rgba(0,0,0,.28);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:12px;
+    box-shadow:0 8px 18px rgba(0,0,0,.22);
+    padding:.75rem;
+  }
+  .partner-form-inner{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .partner-input{
+    flex:1 1 420px; min-width:260px;
+    padding:.6rem .8rem; border:none; border-radius:8px;
+    background:rgba(255,255,255,.12); color:#fff;
+  }
+  .partner-input:disabled{ opacity:.55; cursor:not-allowed; }
+  .partner-submit{
+    padding:.6rem 1rem; border:none; border-radius:8px;
+    background:linear-gradient(135deg,#5865F2,#3b4cca);
+    color:#fff; font-weight:800; cursor:pointer;
+  }
+  .partner-submit:disabled{ filter:grayscale(.6); opacity:.6; cursor:not-allowed; }
+  .partner-note{ opacity:.85 }
+  .partner-error{ color:#ffd5d5; margin-left:.25rem }
+
+  .partner-card{
+    display:grid; grid-template-columns:84px 1fr; gap:.9rem;
+    padding:1rem; border-radius:12px;
+    border:1px solid rgba(255,255,255,.18); background:rgba(0,0,0,.25);
+    box-shadow:0 8px 18px rgba(0,0,0,.24);
+  }
+  .partner-card img{
+    width:84px;height:84px;border-radius:50%;border:2px solid #fff;object-fit:cover
+  }
+  .partner-card h3{ margin:.1rem 0 .25rem }
+  .partner-card p{ margin:.15rem 0; opacity:.9 }
+  .partner-card a{
+    display:inline-block;margin-top:.35rem;background:#1DB954;color:#fff;
+    padding:.45rem .75rem;border-radius:8px;text-decoration:none;font-weight:800
+  }
+  .partner-actions{ margin-top:.4rem; }
+  .partner-actions button{
+    background:#444; color:#fff; border:none; border-radius:8px; padding:.4rem .65rem; cursor:pointer;
   }
 </style>
 </head>
-<body>
+<body class="theme-rgb">
+  <div id="particles"></div>
+  <div id="decor-layer" aria-hidden="true"></div>
+
   <h1>ThatLegendJack</h1>
 
-  <!-- Top-right Login/Logout -->
+  <!-- Top-right controls -->
   <div class="login-container">
+    <button id="seasonBtn" title="Christmas / Halloween / Easter">Theme</button>
+    <button id="themeBtn" title="Colour Modes">Colour mode</button>
     <button id="loginBtn" onclick="location.href='/login.html'">Login</button>
-    <button id="logoutBtn" class="hidden" onclick="doStaffLogout()">Logout</button>
+    <button id="logoutBtn" class="hidden" onclick="doLogout()">Logout</button>
   </div>
 
-  <!-- Staff Chat (hidden by default, shown via JavaScript on home page) -->
-  <div id="staff-chat-container" class="hidden">
-    <div>
-      <strong>Staff Chat</strong>
-      <span id="staffUsernameDisplay" style="float:right;"></span>
-    </div>
-    <div id="staff-chat-messages"></div>
-    <div>
-      <input id="staff-chat-input" type="text" placeholder="Type message...">
-      <button id="staff-chat-send">Send</button>
-    </div>
-  </div>
-
-  <!-- NAV -->
+  <!-- SUB NAV -->
   <div class="nav-center">
-    <div class="nav-box about" role="button">About Me</div>
-    <div class="nav-box leaderboards" role="button">Leaderboards</div>
-    <div class="nav-box partnered" role="button">Partnered Servers</div>
+    <div class="nav-box home" role="button" onclick="showSection('home')">Home</div>
+    <div class="nav-box about" role="button" onclick="showSection('about')">About Me</div>
+    <div class="nav-box leaderboards" role="button" onclick="showSection('leaderboards')">Leaderboards</div>
+    <div class="nav-box partners" role="button" onclick="showSection('partners')">Partnered Servers</div>
   </div>
 
-  <!-- LEFT SOCIAL CIRCLES -->
+  <!-- Social column -->
   <div class="social-stack" aria-label="Social links">
     <!-- Twitch -->
-    <a class="social" href="https://www.twitch.tv/ThatLegendJackk" target="_blank" aria-label="Twitch" id="social-twitch">
+    <a class="social" href="https://www.twitch.tv/ThatLegendJackk" target="_blank" aria-label="Twitch">
       <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#9146FF"/><path d="M60 50h120v82l-38 38h-36l-16 16H72v-20H60V50zm24 24v74h20v20h20l20-20h24V74H84zm64 56V86h-16v44h16zm-36 0V86h-16v44h16z" fill="#fff"/></svg>
     </a>
     <!-- TikTok -->
-    <a class="social" href="https://www.tiktok.com/@thatlegendjack" target="_blank" aria-label="TikTok" id="social-tiktok">
-      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#000"/><path d="M170 56c10 13 23 22 38 24v28c-15-1-29-6-40-14v60c0 35-28 64-64 64s-64-29-64-64 29-64 64-64s64 29 64 64V56h30z" fill="#25F4EE"/><path d="M168 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
+    <a class="social" href="https://www.tiktok.com/@thatlegendjack" target="_blank" aria-label="TikTok">
+      <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#000"/><path d="M170 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
     </a>
     <!-- Kick -->
-    <a class="social" href="https://kick.com/ThatLegendJackk" target="_blank" aria-label="Kick" id="social-kick">
+    <a class="social" href="https://kick.com/ThatLegendJackk" target="_blank" aria-label="Kick">
       <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#52FF00"/><path d="M60 60h40v50l40-50h40l-50 60 50 60h-40l-40-50v50H60V60z" fill="#0d0d0d"/></svg>
     </a>
     <!-- OnlyFans -->
-    <a class="social" href="https://onlyfans.com/your-handle" target="_blank" aria-label="OnlyFans" id="social-onlyfans">
+    <a class="social" href="https://onlyfans.com/your-handle" target="_blank" aria-label="OnlyFans">
       <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#00AFF0"/><path d="M128 76c-29 0-52 23-52 52s23 52 52 52 52-23 52-52-23-52-52-52zm0 24a28 28 0 110 56 28 28 0 010-56z" fill="#fff"/><path d="M206 88h-30l-10 32h16l-8 48h24l12-80h-4z" fill="#fff"/></svg>
     </a>
   </div>
@@ -493,95 +403,158 @@
   <!-- HOME -->
   <section id="home">
     <div class="player-wrap">
-      <div class="player-frame">
-        <div id="twitch-player"></div>
-        <div id="twitch-offline" class="offline-banner">
-          <div><strong>ThatLegendJackk is currently offline.</strong></div>
-          <a class="offline-btn" href="https://www.twitch.tv/ThatLegendJackk" target="_blank">Go to Twitch</a>
+      <div class="twitch-grid">
+        <div class="player-frame">
+          <div class="live-pill" id="livePill">LIVE</div>
+          <div id="twitch-player"></div>
+          <div id="twitch-offline" class="offline-banner">
+            <div><strong>ThatLegendJackk is currently offline.</strong></div>
+            <a class="offline-btn" href="https://www.twitch.tv/ThatLegendJackk" target="_blank">Go to Twitch</a>
+            <div id="clip-strip" style="display:flex;gap:8px;overflow:auto;padding-top:8px">
+              <img src="https://placehold.co/160x90?text=Clip+1" alt="clip" style="border-radius:8px">
+              <img src="https://placehold.co/160x90?text=Clip+2" alt="clip" style="border-radius:8px">
+              <img src="https://placehold.co/160x90?text=Clip+3" alt="clip" style="border-radius:8px">
+            </div>
+          </div>
+          <!-- Spotify album / track -->
+          <div class="album hidden" id="albumCard">
+            <img id="albumArt" src="" alt="album art">
+            <div>
+              <div id="trackTitle" style="font-weight:800">—</div>
+              <div id="trackArtist" style="opacity:.85">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Twitch Chat -->
+        <div class="chat-frame">
+          <iframe
+            title="Twitch Chat"
+            src="https://www.twitch.tv/embed/ThatLegendJackk/chat?parent=localhost&parent=example.com&parent=thatlegendjack.dev"
+            style="border:0;width:100%;height:100%"></iframe>
         </div>
       </div>
     </div>
 
-    <!-- Right-bottom status circles -->
+    <!-- Status circles -->
     <div class="status-container">
-      <div class="circle spotify" id="spotify-circle">
-        <span class="track" id="spotify-track" title="Loading...">Spotify: Loading...</span>
+      <div class="circle spotify glowPulse" id="spotify-circle">
+        <div class="title">Spotify</div>
+        <span class="track" id="spotify-track">Not Connected</span>
+        <div class="viz" id="viz">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
       </div>
-      <div class="circle discord" id="discord-circle"><span id="discord-status">Discord: Loading...</span></div>
+      <div class="circle discord" id="discord-circle">
+        <div class="title">Discord</div>
+        <span id="discord-status">Offline</span>
+        <div id="discord-activity" style="opacity:.85;margin-top:.25rem"></div>
+      </div>
     </div>
 
-    <!-- Admin controls (hidden by default) -->
-    <div id="admin-controls" class="surface hidden" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
-      <h3>Admin Controls</h3>
-      <div class="row">
-        <input id="social-twitch-url" placeholder="Twitch URL" style="flex:1"/>
-        <input id="social-tiktok-url" placeholder="TikTok URL" style="flex:1"/>
-        <input id="social-kick-url" placeholder="Kick URL" style="flex:1"/>
-        <input id="social-onlyfans-url" placeholder="OnlyFans URL" style="flex:1"/>
-        <button>Update Social Links</button>
-      </div>
+    <!-- Spotify connect (demo) -->
+    <div id="spotify-connect" class="surface" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
+      <button onclick="connectSpotify()" class="spotify-btn">Connect Spotify (Demo)</button>
+      <p style="opacity:.9;margin:.5rem 0 0 0">Demo loads a sample preview to drive the visualizer. Replace with real OAuth later.</p>
+      <audio id="spotify-audio" crossorigin="anonymous" class="hidden"></audio>
     </div>
   </section>
 
   <!-- ABOUT -->
   <section id="about" class="hidden">
-    <button class="back-btn">Go back</button>
+    <button class="back-btn" onclick="showSection('home')">Go back</button>
     <div class="surface surface-about">
       <h2>About Me</h2>
-      <div id="about-box" contenteditable="false">Loading...</div>
+      <div id="about-box" contenteditable="false">This is your About Me section<span class="badge">verified</span>.</div>
       <div id="about-save-row" class="row hidden" style="margin-top:.6rem">
-        <button>Save About</button>
-        <button style="background:#444">Cancel</button>
+        <button onclick="saveAbout()">Save About</button>
+        <button style="background:#444" onclick="toggleAboutEdit(false)">Cancel</button>
       </div>
     </div>
   </section>
 
   <!-- LEADERBOARDS -->
   <section id="leaderboards" class="hidden">
-    <button class="back-btn">Go back</button>
+    <button class="back-btn" onclick="showSection('home')">Go back</button>
     <div class="surface surface-leader">
       <h2>Leaderboards</h2>
+
+      <!-- Bits LEFT | Subs RIGHT -->
       <div class="grid">
-        <div class="card">
-          <h3>Bits Leaderboard (All Time)</h3>
+        <div class="card" id="bits-card">
+          <h3>Bits Leaderboard</h3>
           <div class="row" style="align-items:center">
+            <label>Period:</label>
+            <select id="bits_period" style="max-width:160px">
+              <option value="all" selected>all</option>
+              <option value="day">day</option>
+              <option value="week">week</option>
+              <option value="month">month</option>
+              <option value="year">year</option>
+            </select>
             <label>Count:</label>
             <input id="bits_count" type="number" min="1" max="10" value="10" style="max-width:100px"/>
-            <button id="bits_refresh_btn">Refresh</button>
+            <button id="bits_refresh_btn" onclick="refreshBits()">Refresh</button>
           </div>
-          <div id="bits-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No data yet.</div>
+          <div id="bits-list" style="min-height:200px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No data yet.</div>
         </div>
 
-        <div class="card">
+        <div class="card" id="subs-card">
           <h3>Gifted Subs (All Time)</h3>
-          <div id="subs-list" style="min-height:160px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No subs yet.</div>
+          <div id="subs-list" style="min-height:200px;background:rgba(255,255,255,.08);border-radius:8px;padding:.5rem;overflow:auto">No subs yet.</div>
           <div id="subs-controls" class="hidden" style="margin-top:.6rem">
             <div class="row">
               <input id="sub_user" placeholder="Username"/>
               <input id="sub_gifts" type="number" min="0" placeholder="Gifted count"/>
-              <button id="subs_add_btn">Add/Update</button>
+              <button id="subs_add_btn" onclick="addOrUpdateSub()">Add/Update</button>
             </div>
             <div class="row">
-              <button id="subs_reset_btn" style="background:#444">Reset Subs List</button>
+              <button id="subs_reset_btn" style="background:#444" onclick="resetSubs()">Reset Subs List</button>
             </div>
           </div>
         </div>
       </div>
+
+      <details style="margin-top:1rem">
+        <summary style="cursor:pointer;font-weight:800">Twitch API credentials for Bits</summary>
+        <p style="margin:.25rem 0 .6rem 0">Use a <strong>User access token</strong> with <code>bits:read</code> scope.</p>
+        <div class="row">
+          <input id="twitch_client_id" placeholder="Client ID (paste here)"/>
+          <input id="twitch_access_token" placeholder="Access Token (bits:read)"/>
+          <button id="twitch_save_btn" onclick="saveTwitchCreds()">Save</button>
+        </div>
+      </details>
     </div>
   </section>
 
   <!-- PARTNERED SERVERS -->
-  <section id="partnered" class="hidden">
-    <button class="back-btn">Go back</button>
-    <div class="surface surface-partnered">
-      <h2>Partnered Discord Servers</h2>
-      <div id="partnered-servers-list">
-        Loading partnered servers...
+  <section id="partners" class="hidden">
+    <button class="back-btn" onclick="showSection('home')">Go back</button>
+    <div class="surface surface-partners">
+      <h2>Partnered Servers</h2>
+
+      <!-- Always-visible input bar -->
+      <div class="partner-form-bar" id="partner-form">
+        <form onsubmit="addPartnerFromInvite(event)" class="partner-form-inner">
+          <input id="partner_invite"
+                 class="partner-input"
+                 placeholder="Paste Discord invite URL (e.g. https://discord.gg/abc123)"
+                 required>
+          <button type="submit" class="partner-submit">Fetch &amp; Add</button>
+          <small id="partner_note" class="partner-note">
+            Only staff can submit. Others can preview but cannot add.
+          </small>
+          <div id="partner_err" class="partner-error"></div>
+        </form>
       </div>
+
+      <!-- Cards -->
+      <div id="partner-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem"></div>
     </div>
   </section>
 
-  <script src="https://embed.twitch.tv/embed/v1.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
