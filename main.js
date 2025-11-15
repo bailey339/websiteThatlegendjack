@@ -1,850 +1,437 @@
 /* ===== Utilities ===== */
-function safe(fn){ try{ fn(); }catch(e){ console.warn(e); } }
-function $(sel){ return document.querySelector(sel); }
 function showSection(id){
-  document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
-  const target = document.getElementById(id);
-  if (target){ 
-    target.classList.remove('hidden'); 
-    window.scrollTo({top:0,behavior:'smooth'}); 
+  document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+const decor = document.getElementById("decor-layer");
+function clearDecor(){ decor.innerHTML=""; }
+function rnd(min,max){ return Math.random()*(max-min)+min; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)] }
+function createEmoji(char, sizePx, leftPct, topPct, classes="", style=""){
+  const el=document.createElement("div");
+  el.className=`decor-item ${classes}`;
+  el.textContent=char;
+  el.style.cssText=`font-size:${sizePx}px; left:${leftPct}%; top:${topPct}%; ${style}`;
+  decor.appendChild(el);
+  return el;
+}
+
+/* ===== Particles ===== */
+tsParticles.load("particles",{
+  background:{color:{value:"transparent"}},
+  particles:{
+    number:{value:45},
+    size:{value:2},
+    move:{enable:true,speed:.8},
+    opacity:{value:.35},
+    color:{value:"#ffffff"},
+    links:{enable:true,color:"#ffffff",opacity:.15}
   }
-  updateStaffChatVisibility();
-}
+});
 
-/* ===== Staff Authentication ===== */
-let currentStaff = null;
-
-async function checkStaffAuth() {
-  try {
-    const response = await fetch('/api/staff/check');
-    const data = await response.json();
-    
-    if (data.loggedIn) {
-      currentStaff = { username: data.user, role: data.role };
-      applyStaffUI();
-      loadStaffChat();
-      startChatPolling();
-    } else {
-      currentStaff = null;
-      applyStaffUI();
-    }
-  } catch (error) {
-    console.warn('Auth check failed:', error);
-    currentStaff = null;
-    applyStaffUI();
-  }
-}
-
-async function doStaffLogin(e) {
-  if (e) e.preventDefault();
-  const username = $('#staffUsername')?.value?.trim() || '';
-  const password = $('#staffPassword')?.value?.trim() || '';
-  
-  if (!username || !password) {
-    alert('Please enter username and password');
-    return;
-  }
-  
-  try {
-    const response = await fetch('/api/staff/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      currentStaff = { username: data.user, role: data.role };
-      applyStaffUI();
-      loadStaffChat();
-      startChatPolling();
-      if (window.location.pathname === '/login.html') {
-        window.location.href = '/';
-      }
-    } else {
-      alert('Login failed: ' + (data.error || 'Invalid credentials'));
-    }
-  } catch (error) {
-    alert('Login error: ' + error.message);
-  }
-}
-
-async function doStaffLogout() {
-  try {
-    await fetch('/api/staff/logout', { method: 'POST' });
-    currentStaff = null;
-    applyStaffUI();
-    stopChatPolling();
-  } catch (error) {
-    console.warn('Logout error:', error);
-  }
-}
-
-function applyStaffUI() {
-  const isStaff = currentStaff !== null;
-  
-  // Update login/logout buttons
-  safe(() => {
-    const loginBtn = $('#loginBtn');
-    const logoutBtn = $('#logoutBtn');
-    if (loginBtn) loginBtn.classList.toggle('hidden', isStaff);
-    if (logoutBtn) logoutBtn.classList.toggle('hidden', !isStaff);
-  });
-  
-  safe(() => {
-    const usernameDisplay = $('#staffUsernameDisplay');
-    if (usernameDisplay) usernameDisplay.textContent = isStaff ? currentStaff.username : '';
-  });
-  
-  // Show/hide staff controls
-  safe(() => {
-    const aboutBox = $('#about-box');
-    if (aboutBox) aboutBox.contentEditable = isStaff ? 'true' : 'false';
-  });
-  
-  safe(() => {
-    const subsControls = $('#subs-controls');
-    if (subsControls) subsControls.classList.toggle('hidden', !isStaff);
-  });
-  
-  safe(() => {
-    const adminControls = $('#admin-controls');
-    if (adminControls) adminControls.classList.toggle('hidden', !isStaff);
-    
-    // Add Spotify controls for staff
-    if (adminControls && isStaff && !adminControls.querySelector('#spotify-controls')) {
-      const spotifyControls = document.createElement('div');
-      spotifyControls.id = 'spotify-controls';
-      spotifyControls.style.marginTop = '1rem';
-      spotifyControls.style.paddingTop = '1rem';
-      spotifyControls.style.borderTop = '1px solid rgba(255,255,255,0.2)';
-      spotifyControls.innerHTML = `
-        <h4>Spotify Controls</h4>
-        <div class="row">
-          <button id="connect-spotify-btn" class="spotify-btn">Connect Spotify</button>
-          <button id="disconnect-spotify-btn" style="background: #444;">Disconnect Spotify</button>
-        </div>
-      `;
-      adminControls.appendChild(spotifyControls);
-      
-      // Add event listeners for the new buttons
-      document.getElementById('connect-spotify-btn').addEventListener('click', connectSpotify);
-      document.getElementById('disconnect-spotify-btn').addEventListener('click', disconnectSpotify);
-    }
-  });
-  
-  updateStaffChatVisibility();
-  
-  if (isStaff) {
-    loadSocialLinksForEdit();
-  }
-}
-
-/* ===== Staff Chat Visibility ===== */
-function updateStaffChatVisibility() {
-  const staffChat = $('#staff-chat-container');
-  if (!staffChat) return;
-  
-  const isHomePage = !$('#home').classList.contains('hidden');
-  const shouldShow = currentStaff && isHomePage;
-  
-  if (shouldShow) {
-    staffChat.classList.remove('hidden');
-    staffChat.classList.add('visible');
-  } else {
-    staffChat.classList.add('hidden');
-    staffChat.classList.remove('visible');
-  }
-}
-
-/* ===== Staff Chat ===== */
-let chatPollInterval = null;
-
-function startChatPolling() {
-  stopChatPolling();
-  chatPollInterval = setInterval(loadStaffChat, 3000);
-}
-
-function stopChatPolling() {
-  if (chatPollInterval) {
-    clearInterval(chatPollInterval);
-    chatPollInterval = null;
-  }
-}
-
-async function loadStaffChat() {
-  if (!currentStaff) return;
-  
-  try {
-    const response = await fetch('/api/staff/messages');
-    const messages = await response.json();
-    
-    const chatBox = $('#staff-chat-messages');
-    if (!chatBox) return;
-    
-    chatBox.innerHTML = messages.map(msg => `
-      <div class="chat-message">
-        <strong>${msg.username}:</strong> 
-        <span>${msg.message}</span>
-        <small>${new Date(msg.timestamp).toLocaleTimeString()}</small>
-      </div>
-    `).join('');
-    
-    chatBox.scrollTop = chatBox.scrollHeight;
-  } catch (error) {
-    console.warn('Failed to load chat:', error);
-  }
-}
-
-async function sendStaffMessage() {
-  if (!currentStaff) return;
-  
-  const input = $('#staff-chat-input');
-  const message = input?.value?.trim();
-  
-  if (!message) return;
-  
-  try {
-    const response = await fetch('/api/staff/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
-    });
-    
-    if (response.ok) {
-      input.value = '';
-      loadStaffChat();
-    } else {
-      alert('Failed to send message');
-    }
-  } catch (error) {
-    alert('Error sending message: ' + error.message);
-  }
-}
-
-/* ===== Gifted Subs (Database) ===== */
-async function loadSubs() {
-  try {
-    const response = await fetch('/api/subs');
-    const subs = await response.json();
-    renderSubs(subs);
-  } catch (error) {
-    console.warn('Failed to load subs:', error);
-    const subsList = $('#subs-list');
-    if (subsList) subsList.innerHTML = 'Error loading subs';
-  }
-}
-
-async function addOrUpdateSub() {
-  const username = $('#sub_user')?.value?.trim();
-  const gifts = parseInt($('#sub_gifts')?.value || '0', 10);
-  
-  if (!username || isNaN(gifts)) {
-    alert('Enter username and valid gifts number');
-    return;
-  }
-  
-  try {
-    const response = await fetch('/api/subs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, gifts })
-    });
-    
-    if (response.ok) {
-      const subUser = $('#sub_user');
-      const subGifts = $('#sub_gifts');
-      if (subUser) subUser.value = '';
-      if (subGifts) subGifts.value = '';
-      loadSubs();
-    } else {
-      alert('Failed to update subs');
-    }
-  } catch (error) {
-    alert('Error updating subs: ' + error.message);
-  }
-}
-
-async function resetSubs() {
-  if (!confirm('Reset all gifted subs?')) return;
-  
-  try {
-    const response = await fetch('/api/subs', { method: 'DELETE' });
-    
-    if (response.ok) {
-      loadSubs();
-    } else {
-      alert('Failed to reset subs');
-    }
-  } catch (error) {
-    alert('Error resetting subs: ' + error.message);
-  }
-}
-
-function renderSubs(subs) {
-  const box = $('#subs-list');
-  if (!box) return;
-  
-  if (!subs.length) {
-    box.innerHTML = 'No subs yet.';
-    return;
-  }
-  
-  const html = `<table>
-    <thead><tr><th>#</th><th>User</th><th>Gifted</th></tr></thead>
-    <tbody>
-      ${subs.map((s, i) => `
-        <tr><td>${i + 1}</td><td>${s.username}</td><td>${s.gifts}</td></tr>
-      `).join('')}
-    </tbody>
-  </table>`;
-  
-  box.innerHTML = html;
-}
-
-/* ===== Twitch Bits (Server-side) ===== */
-async function refreshBits() {
-  const listEl = $('#bits-list');
-  if (!listEl) return;
-  
-  const count = Math.min(Math.max(parseInt($('#bits_count')?.value || '10', 10), 1), 10);
-  
-  listEl.innerHTML = '<p>Loading…</p>';
-  
-  try {
-    const response = await fetch(`/api/twitch/bits?count=${count}&period=all`);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'API error');
-    }
-    
-    if (!data.data || data.data.length === 0) {
-      listEl.innerHTML = '<p>No results.</p>';
-      return;
-    }
-    
-    const rows = data.data.map(entry => `
-      <tr>
-        <td>${entry.rank}</td>
-        <td>${entry.user_name || entry.user_login || entry.user_id}</td>
-        <td>${entry.score}</td>
-      </tr>
-    `).join('');
-    
-    listEl.innerHTML = `<table>
-      <thead><tr><th>#</th><th>User</th><th>Bits</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-  } catch (err) {
-    listEl.innerHTML = `
-      <div style="padding:.6rem;background:rgba(0,0,0,.35);border-radius:8px">
-        <p><strong>Error:</strong> ${err.message}</p>
-        <p>Twitch credentials need to be configured on the server.</p>
-      </div>`;
-  }
-}
-
-/* ===== Partnered Servers ===== */
-async function loadPartneredServers() {
-  try {
-    const response = await fetch('/api/partnered-servers');
-    const servers = await response.json();
-    renderPartneredServers(servers);
-  } catch (error) {
-    console.warn('Failed to load partnered servers:', error);
-    const serversList = $('#partnered-servers-list');
-    if (serversList) serversList.innerHTML = 'Error loading partnered servers';
-  }
-}
-
-function renderPartneredServers(servers) {
-  const container = $('#partnered-servers-list');
-  if (!container) return;
-  
-  if (!servers.length) {
-    container.innerHTML = '<p>No partnered servers configured yet.</p>';
-    return;
-  }
-  
-  const html = servers.map(server => `
-    <div class="server-card">
-      <div class="server-image">
-        ${server.image ? `<img src="${server.image}" alt="${server.name}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/80x80/9C824A/FFFFFF?text=Error'">` : '<div class="no-image">No Image</div>'}
-      </div>
-      <div class="server-info">
-        <h4>${server.name}</h4>
-        <p>${server.description}</p>
-      </div>
-      <a href="${server.inviteLink}" target="_blank" class="join-btn">Join Server</a>
-    </div>
-  `).join('');
-  
-  container.innerHTML = html;
-}
-
-/* ===== Global About Me ===== */
-async function loadAbout(){
-  try {
-    const r = await fetch('/api/about');
-    const data = await r.json();
-    const aboutBox = $('#about-box');
-    if (aboutBox && data.html) aboutBox.innerHTML = data.html;
-  } catch {
-    const aboutBox = $('#about-box');
-    if (aboutBox) aboutBox.innerHTML = '<p>Welcome to my stream!</p>';
-  }
-}
-
-function toggleAboutEdit(enable=true){
-  safe(() => {
-    const aboutBox = $('#about-box');
-    if (aboutBox) aboutBox.contentEditable = enable ? 'true' : 'false';
-  });
-  safe(() => {
-    const saveRow = $('#about-save-row');
-    if (saveRow) saveRow.classList.toggle('hidden', !enable);
-  });
-}
-
-function saveAbout(){
-  const aboutBox = $('#about-box');
-  const html = aboutBox?.innerHTML || '';
-  
-  fetch('/api/about', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html })
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.success) {
-      toggleAboutEdit(false);
-      alert('About saved');
-    } else {
-      alert('Failed to save');
-    }
-  })
-  .catch(() => alert('Error saving'));
-}
-
-/* ===== Social Links Management ===== */
-async function loadSocialLinks(){
-  try {
-    const r = await fetch('/api/social-links');
-    const links = await r.json();
-    
-    document.querySelectorAll('.social').forEach(link => {
-      const platform = link.getAttribute('aria-label')?.toLowerCase();
-      if (platform && links[platform]) {
-        link.href = links[platform];
-      }
-    });
-  } catch (e) {
-    console.warn('Failed to load social links:', e);
-  }
-}
-
-async function loadSocialLinksForEdit(){
-  try {
-    const r = await fetch('/api/social-links');
-    const links = await r.json();
-    
-    const twitchUrl = $('#social-twitch-url');
-    const tiktokUrl = $('#social-tiktok-url');
-    const kickUrl = $('#social-kick-url');
-    const onlyfansUrl = $('#social-onlyfans-url');
-    
-    if (twitchUrl) twitchUrl.value = links.twitch || '';
-    if (tiktokUrl) tiktokUrl.value = links.tiktok || '';
-    if (kickUrl) kickUrl.value = links.kick || '';
-    if (onlyfansUrl) onlyfansUrl.value = links.onlyfans || '';
-  } catch (e) {
-    console.warn('Failed to load social links for edit:', e);
-  }
-}
-
-function updateSocialLinks(){
-  const updates = {
-    twitch: $('#social-twitch-url')?.value?.trim() || '',
-    tiktok: $('#social-tiktok-url')?.value?.trim() || '',
-    kick: $('#social-kick-url')?.value?.trim() || '',
-    onlyfans: $('#social-onlyfans-url')?.value?.trim() || ''
-  };
-  
-  fetch('/api/social-links', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates)
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.success) {
-      alert('Social links updated');
-      loadSocialLinks();
-    } else {
-      alert('Failed to update social links');
-    }
-  })
-  .catch(() => alert('Error updating social links'));
-}
-
-/* ===== Twitch Embed ===== */
-const TWITCH_CHANNEL = 'ThatLegendJackk';
-let twitchEmbed = null;
-
+/* ===== Twitch ===== */
+let embed;
 function initTwitch(){
-  const el = document.getElementById('twitch-player');
-  if (!el) return;
-  if (typeof Twitch === 'undefined' || !Twitch.Embed){ 
-    setTimeout(initTwitch, 250); 
-    return; 
-  }
-  if (twitchEmbed) return;
-  
-  const parentHost = location.hostname || 'localhost';
-  twitchEmbed = new Twitch.Embed('twitch-player', {
-    width:'100%', height:'100%', channel: TWITCH_CHANNEL, layout:'video', muted:true,
-    parent:[parentHost],
+  const parent = location.hostname || "localhost";
+  embed = new Twitch.Embed("twitch-player", {
+    width:"100%", height:"100%", channel:"ThatLegendJackk",
+    layout:"video", autoplay:false, muted:true, parent:[parent, "localhost", "example.com", "thatlegendjack.dev"]
+  });
+  embed.addEventListener(Twitch.Embed.VIDEO_READY, ()=>{
+    const player = embed.getPlayer();
+    player.addEventListener("PLAY", ()=> document.getElementById("livePill").style.display="inline-flex");
+    player.addEventListener("PAUSE", ()=> document.getElementById("livePill").style.display="none");
+  });
+  embed.addEventListener(Twitch.Embed.ONLINE, ()=>{
+    document.getElementById("twitch-offline").classList.remove("offline-show");
+    document.getElementById("livePill").style.display="inline-flex";
+  });
+  embed.addEventListener(Twitch.Embed.OFFLINE, ()=>{
+    document.getElementById("twitch-offline").classList.add("offline-show");
+    document.getElementById("livePill").style.display="none";
   });
 }
+window.addEventListener("load", initTwitch);
 
-/* ===== Discord Presence ===== */
-let DISCORD_USER_ID = '';
-let lanyardWs = null;
+/* ===== Colour mode cycler (RGB / Dark / Light) ===== */
+const colourModes=["theme-rgb","theme-dark","theme-light"]; let cm=0;
+document.getElementById("themeBtn").onclick=()=>{
+  document.body.classList.remove(...colourModes, ...seasonalModes);
+  clearDecor();
+  cm=(cm+1)%colourModes.length;
+  document.body.classList.add(colourModes[cm]);
+};
 
-async function loadDiscordConfig(){
+/* ===== Seasonal theme cycler (Christmas / Halloween / Easter) ===== */
+const seasonalModes=["theme-christmas","theme-halloween","theme-easter"]; let sm=-1;
+document.getElementById("seasonBtn").onclick=()=>{
+  document.body.classList.remove(...colourModes, ...seasonalModes);
+  sm=(sm+1)%seasonalModes.length;
+  document.body.classList.add(seasonalModes[sm]);
+  applySeasonalDecor(seasonalModes[sm]);
+};
+
+/* Random motion preset for emojis */
+function randomMotion() {
+  const dirs = [
+    ["drift-right bob",  rnd(12,28)],  // L → R
+    ["drift-left  bob",  rnd(12,28)],  // R → L
+    ["flake",            rnd(10,24)],  // down with sway
+  ];
+  const [cls, dur] = pick(dirs);
+  return { cls, dur };
+}
+
+/* ===== HALLOWEEN — spread everywhere ===== */
+function renderHalloweenDecor(){
+  clearDecor();
+
+  // Pumpkins
+  const pumpkins = 50;
+  for (let i=0;i<pumpkins;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji(
+      "🎃", rnd(20,42), rnd(0,98), rnd(2,95),
+      `${cls} wiggle`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`
+    );
+  }
+
+  // Bats
+  const bats = 60;
+  for (let i=0;i<bats;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji(
+      "🦇", rnd(16,34), rnd(0,98), rnd(2,92),
+      `${cls} wiggle`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`
+    );
+  }
+
+  // Webs
+  const webs = 14;
+  for (let i=0;i<webs;i++){
+    createEmoji(
+      "🕸️", rnd(30,54), rnd(0,96), rnd(0,92),
+      "spin",
+      `opacity:${rnd(.4,.7).toFixed(2)}; animation-duration:${rnd(8,18).toFixed(2)}s;`
+    );
+  }
+
+  // Spiders
+  const spiders = 24;
+  for (let i=0;i<spiders;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji(
+      "🕷️", rnd(16,26), rnd(0,98), rnd(0,92),
+      `${cls} bob`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`
+    );
+  }
+}
+
+/* ===== CHRISTMAS — spread everywhere ===== */
+function renderChristmasDecor(){
+  clearDecor();
+
+  // Snowflakes
+  const flakes = 260;
+  for(let i=0;i<flakes;i++){
+    const el = document.createElement("div");
+    el.className = "decor-item flake";
+    el.textContent = pick(["❄️","❅","✨"]);
+    const size = rnd(10,22);
+    el.style.cssText = `
+      left:${rnd(0,100)}%; top:${rnd(-10,100)}vh; font-size:${size}px;
+      animation-duration:${rnd(8,22).toFixed(2)}s, ${rnd(3,7).toFixed(2)}s;
+      animation-delay:${rnd(0,10).toFixed(2)}s, ${rnd(0,4).toFixed(2)}s;
+    `;
+    decor.appendChild(el);
+  }
+
+  // Santa
+  createEmoji("🎅", rnd(36,54), rnd(0,98), rnd(4,40), "drift-right bob",
+    `animation-duration:${rnd(18,26).toFixed(2)}s; animation-delay:${rnd(0,3).toFixed(2)}s;`);
+
+  // Reindeer herds
+  const herds = 18;
+  for(let i=0;i<herds;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji("🦌", rnd(22,32), rnd(0,98), rnd(2,92), `${cls} bob`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`);
+  }
+
+  // Candy canes (🍭 stand-in)
+  const canes = 36;
+  for(let i=0;i<canes;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji("🍭", rnd(18,28), rnd(0,98), rnd(2,92), `${cls} bob`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,8).toFixed(2)}s;`);
+  }
+
+  // Stars
+  const stars = 40;
+  for(let i=0;i<stars;i++){
+    createEmoji("⭐", rnd(14,22), rnd(2,98), rnd(0,48), "wiggle",
+      `animation-duration:${rnd(1.6,3.2).toFixed(2)}s; opacity:${rnd(.55,1).toFixed(2)};`);
+  }
+}
+
+/* ===== EASTER — spread everywhere ===== */
+function renderEasterDecor(){
+  clearDecor();
+
+  // Eggs/chicks/candy
+  const eggs = 80;
+  const eggSet = ["🥚","🐣","🐥","🐤","🍬"];
+  for(let i=0;i<eggs;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji(pick(eggSet), rnd(18,30), rnd(0,98), rnd(2,92),
+      `${cls} bob`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`);
+  }
+
+  // Bunnies
+  const bunnies = 28;
+  for(let i=0;i<bunnies;i++){
+    const {cls, dur} = randomMotion();
+    createEmoji(pick(["🐰","🐇"]), rnd(24,34), rnd(0,98), rnd(10,92),
+      `${cls}`,
+      `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`);
+  }
+
+  // Flowers
+  const flowers = 44;
+  for(let i=0;i<flowers;i++){
+    createEmoji(pick(["🌷","🌼","🌸","🌻"]), rnd(16,24), rnd(2,98), rnd(10,92),
+      "bob",
+      `animation-duration:${rnd(2.2,4.6).toFixed(2)}s;`);
+  }
+
+  // Balloons rising
+  const balloons = 30;
+  for(let i=0;i<balloons;i++){
+    const el = createEmoji("🎈", rnd(16,26), rnd(0,100), rnd(70,100),
+      "", "transition: transform 14s linear;");
+    requestAnimationFrame(()=>{ el.style.transform = `translateY(-140vh)`; });
+  }
+}
+
+function applySeasonalDecor(mode){
+  if(mode==="theme-halloween") renderHalloweenDecor();
+  else if(mode==="theme-christmas") renderChristmasDecor();
+  else if(mode==="theme-easter") renderEasterDecor();
+  else clearDecor();
+}
+
+/* ===== Spotify visualizer (demo) ===== */
+const audioEl=document.getElementById("spotify-audio");
+let audioCtx, analyser, dataArray;
+function connectSpotify(){
+  const demo="https://p.scdn.co/mp3-preview/6a1c6b7b9a332e66a3ab75c6f1a0c2d1c9a3a6d3?cid=774b29d4f13844c495f206cafdad9c86";
+  audioEl.src=demo; audioEl.loop=true; audioEl.play();
+  document.getElementById("spotify-track").textContent="Demo Track — Preview";
+  document.getElementById("albumCard").classList.remove("hidden");
+  document.getElementById("albumArt").src="https://placehold.co/96x96?text=Album";
+  document.getElementById("trackTitle").textContent="Demo Track";
+  document.getElementById("trackArtist").textContent="Artist";
+  if(!audioCtx){
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaElementSource(audioEl);
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=64;
+    src.connect(analyser); analyser.connect(audioCtx.destination);
+    dataArray=new Uint8Array(analyser.frequencyBinCount);
+    (function loop(){
+      analyser.getByteFrequencyData(dataArray);
+      document.querySelectorAll("#viz .bar").forEach((b,i)=>{
+        const v=dataArray[i%dataArray.length]/255;
+        b.style.height=(6+v*24)+"px";
+        b.style.transform=`scaleY(${0.6+v*1.8})`;
+      });
+      requestAnimationFrame(loop);
+    })();
+  }
+}
+
+/* ===== Discord Presence (Lanyard) ===== */
+const DISCORD_ID="000000000000000000"; // replace with your user ID
+try{
+  const ws=new WebSocket("wss://api.lanyard.rest/socket");
+  ws.onopen=()=>ws.send(JSON.stringify({op:2,d:{subscribe_to_ids:[DISCORD_ID]}}));
+  ws.onmessage=(ev)=>{
+    const {t,d}=JSON.parse(ev.data||"{}");
+    if(t==="INIT_STATE"||t==="PRESENCE_UPDATE"){
+      const u=(t==="INIT_STATE")?d[DISCORD_ID]:d;
+      if(!u) return;
+      const m={online:"Online",idle:"Idle",dnd:"Do Not Disturb",offline:"Offline"};
+      document.getElementById("discord-status").textContent=m[u.discord_status]||"Offline";
+      const act=(u.activities||[]).find(a=>a.type===0||a.type===4);
+      document.getElementById("discord-activity").textContent=act?(act.state||act.name):"";
+    }
+  };
+}catch{}
+
+/* ===== Leaderboards (demo/local) ===== */
+function refreshBits(){
+  const n=parseInt(document.getElementById("bits_count").value)||10;
+  const list=document.getElementById("bits-list");
+  list.innerHTML="<em>Fetching…</em>";
+  setTimeout(()=>{
+    const data=[["UserA",1200],["UserB",880],["UserC",640],["UserD",420],["UserE",300],["UserF",250],["UserG",210],["UserH",190],["UserI",170],["UserJ",160]];
+    list.innerHTML=data.slice(0,n).map((r,i)=>`<div class="flash">#${i+1} <b>${r[0]}</b> — ${r[1]} bits</div>`).join("");
+  },400);
+}
+let subs=JSON.parse(localStorage.getItem("subsList")||"[]");
+function renderSubs(){
+  const list=document.getElementById("subs-list");
+  if(!subs.length){list.textContent="No subs yet.";return;}
+  list.innerHTML=subs.sort((a,b)=>b.count-a.count).map((s,i)=>`<div class="flash">#${i+1} <b>${s.name}</b> — ${s.count} gifted</div>`).join("");
+}
+function addOrUpdateSub(){
+  const u=document.getElementById("sub_user").value.trim();
+  const c=parseInt(document.getElementById("sub_gifts").value)||0;
+  if(!u) return alert("Enter a username");
+  const i=subs.findIndex(x=>x.name.toLowerCase()===u.toLowerCase());
+  if(i>=0) subs[i].count=c; else subs.push({name:u,count:c});
+  localStorage.setItem("subsList",JSON.stringify(subs)); renderSubs();
+  confetti({particleCount:60,spread:70,origin:{y:.75}});
+}
+function resetSubs(){ if(!confirm("Reset all subs?"))return; subs=[]; localStorage.removeItem("subsList"); renderSubs(); }
+function saveTwitchCreds(){
+  localStorage.setItem("twitchClientID",document.getElementById("twitch_client_id").value);
+  localStorage.setItem("twitchToken",document.getElementById("twitch_access_token").value);
+  alert("Saved!");
+}
+
+/* ===== Partnered Servers (auto-fetch from Discord invite) ===== */
+function isStaff() {
+  try {
+    return localStorage.getItem('staffSession') === 'true' &&
+           (localStorage.getItem('staffRole') === 'staff' || localStorage.getItem('staffRole') === 'admin');
+  } catch { return false; }
+}
+
+function initPartnersUI() {
+  // Form is always visible now; we only disable inputs for non-staff
+  const input  = document.getElementById('partner_invite');
+  const submit = document.querySelector('.partner-submit');
+  const note   = document.getElementById('partner_note');
+
+  const staff = isStaff();
+  input.disabled  = !staff;
+  submit.disabled = !staff;
+  note.textContent = staff
+    ? 'Paste an invite and click Fetch & Add.'
+    : 'Only staff can submit. Ask a mod to add your server.';
+
+  renderPartners();
+}
+
+function parseInviteCode(str) {
+  if (!str) return null;
+  const m = String(str).trim().match(/(?:discord\.gg\/|discord\.com\/invite\/)?([A-Za-z0-9-]+)/i);
+  return m ? m[1] : null;
+}
+function discordIconURL(guild) {
+  if (!guild || !guild.icon) return 'https://placehold.co/128x128?text=Discord';
+  const ext = guild.icon.startsWith('a_') ? 'gif' : 'png';
+  return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${ext}?size=256`;
+}
+function positiveBlurb(guild) {
+  if (guild?.description) return guild.description;
+  const members = guild?.approximate_member_count || guild?.member_count;
+  const online  = guild?.approximate_presence_count || guild?.presence_count;
+  const base = guild?.name || 'this community';
+  if (members && online) {
+    return `${base} is a welcoming server with ${members.toLocaleString()} members (${online.toLocaleString()} active) — come hang out!`;
+  }
+  return `${base} is a friendly, positive community full of good vibes.`;
+}
+function getPartners(){ try{ return JSON.parse(localStorage.getItem('partners')||'[]'); }catch{ return []; } }
+function savePartners(list){ localStorage.setItem('partners', JSON.stringify(list)); }
+
+async function addPartnerFromInvite(e){
+  e.preventDefault();
+  if (!isStaff()) return; // safety
+
+  const input = document.getElementById('partner_invite');
+  const errEl = document.getElementById('partner_err');
+  errEl.textContent = '';
+
+  const code = parseInviteCode(input.value);
+  if (!code){ errEl.textContent='Please paste a valid Discord invite.'; return; }
+
   try{
-    const cfg = await fetch('/api/config').then(r => r.json());
-    DISCORD_USER_ID = cfg?.discord_user_id || '';
-    
-    const discordStatus = $('#discord-status');
-    
-    if (DISCORD_USER_ID) {
-      if (discordStatus) discordStatus.textContent = 'Discord: Loading...';
-      connectLanyard();
-    } else {
-      if (discordStatus) discordStatus.textContent = 'Discord: Not Configured';
-    }
-  }catch(e){ 
-    console.warn('Failed to load Discord config:', e);
-    const discordStatus = $('#discord-status');
-    if (discordStatus) discordStatus.textContent = 'Discord: Error';
-  }
-}
-
-function connectLanyard(){
-  if (!DISCORD_USER_ID) return;
-  
-  if (lanyardWs) lanyardWs.close();
-  
-  const discordStatus = $('#discord-status');
-  if (discordStatus) discordStatus.textContent = 'Discord: Connecting...';
-  
-  lanyardWs = new WebSocket('wss://api.lanyard.rest/socket');
-  
-  lanyardWs.addEventListener('open', () => {
-    lanyardWs.send(JSON.stringify({
-      op: 2,
-      d: { subscribe_to_id: DISCORD_USER_ID }
-    }));
-  });
-  
-  lanyardWs.addEventListener('message', (event) => {
-    try{
-      const data = JSON.parse(event.data);
-      
-      if (data.op === 1) {
-        // Heartbeat request
-        lanyardWs.send(JSON.stringify({ op: 3 }));
-        return;
-      }
-      
-      if (data.t === 'INIT_STATE' || data.t === 'PRESENCE_UPDATE') {
-        const status = data.d?.discord_status || 'offline';
-        const activities = data.d?.activities || [];
-        
-        const statusEl = $('#discord-status');
-        if (statusEl) {
-          // Only show Discord status, NOT Spotify info
-          let statusText = `Discord: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
-          
-          // Add custom status if available
-          const customStatus = activities.find(a => a.type === 4);
-          if (customStatus && customStatus.state) {
-            statusText += ` - ${customStatus.state}`;
-          }
-          
-          statusEl.textContent = statusText;
-        }
-      }
-    }catch(e){
-      console.warn('Lanyard message error:', e);
-    }
-  });
-  
-  lanyardWs.addEventListener('close', () => {
-    const discordStatus = $('#discord-status');
-    if (discordStatus) discordStatus.textContent = 'Discord: Reconnecting...';
-    setTimeout(connectLanyard, 5000);
-  });
-  
-  lanyardWs.addEventListener('error', () => {
-    const discordStatus = $('#discord-status');
-    if (discordStatus) discordStatus.textContent = 'Discord: Connection Error';
-  });
-}
-
-/* ===== Spotify Live Status (Server-wide) ===== */
-let spotifyTimer = null;
-
-async function updateSpotify(){
-  const el = $('#spotify-track');
-  if (!el) return;
-  
-  try {
-    const r = await fetch('/api/spotify/now-playing');
-    
-    if (r.status === 401) {
-      el.textContent = 'Spotify: Not Connected';
-      el.title = 'Staff can connect Spotify in admin controls';
-      el.classList.remove('scrolling');
-      return;
-    }
-    
-    if (r.ok) {
-      const data = await r.json();
-      
-      if (!data || data.playing === false || !data.item) {
-        el.textContent = 'Spotify: Not Playing';
-        el.title = 'Spotify: Not Playing';
-        el.classList.remove('scrolling');
-      } else {
-        const name = data.item?.name || 'Unknown Track';
-        const artists = (data.item?.artists || []).map(a => a.name).join(', ') || 'Unknown Artist';
-        const fullText = `🎵 ${name} - ${artists}`;
-        
-        el.textContent = fullText;
-        el.title = fullText;
-        
-        if (fullText.length > 30) {
-          el.classList.add('scrolling');
-        } else {
-          el.classList.remove('scrolling');
-        }
-      }
-    } else {
-      el.textContent = 'Spotify: Error';
-      el.title = 'Spotify: Error';
-      el.classList.remove('scrolling');
-    }
-  } catch (error) {
-    console.warn('Spotify update error:', error);
-    el.textContent = 'Spotify: Offline';
-    el.title = 'Spotify: Offline';
-    el.classList.remove('scrolling');
-  }
-  
-  clearTimeout(spotifyTimer);
-  spotifyTimer = setTimeout(updateSpotify, 10000);
-}
-
-// Test function to manually check Spotify status
-async function testSpotify() {
-  console.log('Testing Spotify connection...');
-  try {
-    const response = await fetch('/api/spotify/now-playing');
-    console.log('Spotify response status:', response.status);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Spotify data:', data);
-      
-      if (data && data.item) {
-        console.log('Now playing:', data.item.name, '-', data.item.artists.map(a => a.name).join(', '));
-      } else {
-        console.log('Spotify not playing or no data');
-      }
-    } else {
-      console.log('Spotify API error:', response.status);
-    }
-  } catch (error) {
-    console.log('Spotify test error:', error);
-  }
-}
-
-// Spotify control functions
-function connectSpotify() {
-  window.open('/auth/spotify/login', '_blank');
-}
-
-async function disconnectSpotify() {
-  if (!confirm('Disconnect Spotify for everyone?')) return;
-  
-  try {
-    const response = await fetch('/api/spotify/disconnect', {
-      method: 'DELETE'
-    });
-    
-    if (response.ok) {
-      alert('Spotify disconnected');
-      updateSpotify(); // Refresh the display
-    } else {
-      alert('Failed to disconnect Spotify');
-    }
-  } catch (error) {
-    alert('Error disconnecting Spotify: ' + error.message);
-  }
-}
-
-/* ===== Event Binding ===== */
-function bindEvents() {
-  // Navigation buttons
-  document.querySelectorAll('.nav-box.about').forEach(btn => {
-    btn.addEventListener('click', function() {
-      showSection('about');
-    });
-  });
-  
-  document.querySelectorAll('.nav-box.leaderboards').forEach(btn => {
-    btn.addEventListener('click', function() {
-      showSection('leaderboards');
-      refreshBits(); // Load bits when showing leaderboards
-    });
-  });
-  
-  document.querySelectorAll('.nav-box.partnered').forEach(btn => {
-    btn.addEventListener('click', function() {
-      showSection('partnered');
-      loadPartneredServers();
-    });
-  });
-  
-  // Back buttons
-  document.querySelectorAll('.back-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      showSection('home');
-    });
-  });
-  
-  // Bits refresh button
-  const bitsRefreshBtn = $('#bits_refresh_btn');
-  if (bitsRefreshBtn) {
-    bitsRefreshBtn.addEventListener('click', function(e) { 
-      e.preventDefault(); 
-      refreshBits(); 
-    });
-  }
-  
-  // Subs buttons
-  const subsAddBtn = $('#subs_add_btn');
-  if (subsAddBtn) {
-    subsAddBtn.addEventListener('click', function(e) { 
-      e.preventDefault(); 
-      addOrUpdateSub(); 
-    });
-  }
-  
-  const subsResetBtn = $('#subs_reset_btn');
-  if (subsResetBtn) {
-    subsResetBtn.addEventListener('click', function(e) { 
-      e.preventDefault(); 
-      resetSubs(); 
-    });
-  }
-  
-  // Social links update button
-  const socialUpdateBtn = document.querySelector('#admin-controls button');
-  if (socialUpdateBtn && !socialUpdateBtn.id) {
-    socialUpdateBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      updateSocialLinks();
-    });
-  }
-  
-  // About buttons
-  const aboutSaveBtn = document.querySelector('#about-save-row button:first-child');
-  if (aboutSaveBtn) {
-    aboutSaveBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      saveAbout();
-    });
-  }
-  
-  const aboutCancelBtn = document.querySelector('#about-save-row button:last-child');
-  if (aboutCancelBtn) {
-    aboutCancelBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      toggleAboutEdit(false);
-    });
-  }
-  
-  // Staff chat
-  const staffChatSend = $('#staff-chat-send');
-  if (staffChatSend) {
-    staffChatSend.addEventListener('click', function(e) { 
-      e.preventDefault(); 
-      sendStaffMessage(); 
-    });
-  }
-  
-  const staffChatInput = $('#staff-chat-input');
-  if (staffChatInput) {
-    staffChatInput.addEventListener('keypress', function(e) { 
-      if (e.key === 'Enter') sendStaffMessage(); 
-    });
-  }
-  
-  // Logout button
-  const logoutBtn = $('#logoutBtn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      doStaffLogout();
-    });
-  }
-  
-  // Login form (if on login page)
-  const loginForm = document.querySelector('form[onsubmit*="doStaffLogin"]');
-  if (loginForm) {
-    loginForm.addEventListener('submit', function(e) {
-      doStaffLogin(e);
-    });
-  }
-}
-
-/* ===== Boot ===== */
-window.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded, initializing...');
-  
-  showSection('home');
-  loadAbout();
-  loadSocialLinks();
-  loadSubs();
-
-  // Twitch embed
-  if (typeof Twitch === 'undefined') {
-    const twitchScript = document.createElement('script');
-    twitchScript.src = 'https://embed.twitch.tv/embed/v1.js';
-    twitchScript.onload = function() { 
-      console.log('Twitch script loaded');
-      initTwitch(); 
+    const url = `https://discord.com/api/v9/invites/${code}?with_counts=true&with_expiration=true`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Invite not found');
+    const data = await res.json();
+    const guild = data.guild || {};
+    const card = {
+      id: guild.id || code,
+      name: guild.name || 'Discord Server',
+      icon: discordIconURL(guild),
+      url: `https://discord.gg/${code}`,
+      desc: positiveBlurb(guild),
     };
-    document.head.appendChild(twitchScript);
-  } else { 
-    initTwitch(); 
+
+    const list = getPartners();
+    const i = list.findIndex(x => x.id === card.id);
+    if (i >= 0) list[i] = card; else list.push(card);
+    savePartners(list);
+    input.value = '';
+    renderPartners(true);
+  }catch(err){
+    console.error(err);
+    errEl.textContent = 'Could not fetch that invite. Check the link and try again.';
   }
+}
 
-  // Discord + Spotify
-  loadDiscordConfig();
-  updateSpotify();
+function renderPartners(flashLast=false){
+  const grid = document.getElementById('partner-grid');
+  const list = getPartners();
+  grid.innerHTML = list.length ? '' : '<p>No partners yet.</p>';
+  list.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'partner-card';
+    card.innerHTML = `
+      <img src="${p.icon}" alt="${p.name} icon" onerror="this.src='https://placehold.co/128x128?text=Discord'">
+      <div>
+        <h3>${escapeHTML(p.name)}</h3>
+        <p>${escapeHTML(p.desc)}</p>
+        <a href="${p.url}" target="_blank">Join Server</a>
+        ${isStaff() ? `<div class="partner-actions"><button onclick="removePartner('${p.id}')">Remove</button></div>` : ''}
+      </div>`;
+    grid.appendChild(card);
+    if (flashLast && i===list.length-1){ card.classList.add('flash'); setTimeout(()=>card.classList.remove('flash'),800); }
+  });
+}
+function removePartner(id){
+  if (!isStaff()) return;
+  savePartners(getPartners().filter(x=>x.id!==id));
+  renderPartners();
+}
+function escapeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-  // Check staff authentication
-  checkStaffAuth();
+/* ===== Simple auth state ===== */
+function doLogout(){
+  localStorage.clear();
+  document.getElementById("logoutBtn").classList.add("hidden");
+  document.getElementById("loginBtn").classList.remove("hidden");
+  document.getElementById("subs-controls").classList.add("hidden");
+  initPartnersUI(); // re-disable partner form if needed
+}
 
-  // Bind all event listeners
-  bindEvents();
-  
-  console.log('Initialization complete');
+/* ===== Init ===== */
+window.addEventListener("load", ()=>{
+  // demo staff flag handling
+  if(localStorage.getItem("staffSession")==="true"){
+    document.getElementById("logoutBtn").classList.remove("hidden");
+    document.getElementById("loginBtn").classList.add("hidden");
+    document.getElementById("subs-controls").classList.remove("hidden");
+  }
+  initPartnersUI();
+  renderSubs(); refreshBits();
 });
