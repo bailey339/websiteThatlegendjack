@@ -11,111 +11,6 @@
 <script src="https://embed.twitch.tv/embed/v1.js"></script>
 
 <style>
-/* ====== MERGED EXTERNAL CSS ====== */
-:root{
-  --ars-red:#EF0107; --ars-white:#FFF; --ars-navy:#063672; --ars-gold:#9C824A;
-  --bgA: rgba(0,0,0,.35); --glass: rgba(20,20,28,.35);
-  --txt:#fff; --muted:rgba(255,255,255,.75);
-}
-*{box-sizing:border-box}
-body{
-  margin:0; color:var(--txt); text-align:center; font-family: Inter, system-ui, Arial, Helvetica, sans-serif;
-  background: radial-gradient(1200px 1200px at 10% -10%, #ff6b6b20, transparent 50%),
-              radial-gradient(1000px 1000px at 110% 10%, #6bcbff20, transparent 50%),
-              linear-gradient(135deg,var(--ars-red) 0%,var(--ars-white) 35%,var(--ars-navy) 70%,var(--ars-gold) 100%);
-  background-size: 160% 160%;
-  animation: bgShift 18s ease-in-out infinite;
-  overflow-x:hidden;
-}
-@keyframes bgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-
-h1{
-  margin:1rem 0 0; font-size:clamp(2rem,5vw,3rem); font-weight:900;
-  background:linear-gradient(270deg,#EF0107,#FFFFFF,#063672,#EF0107);
-  background-size:600% 600%;
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent; -webkit-text-stroke:2px #000;
-  animation:gradientShift 8s ease infinite;
-  text-shadow:0 8px 24px rgba(0,0,0,.35);
-}
-@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-
-.hidden{display:none}
-section{padding:1rem}
-
-/* Top-right controls */
-.login-container{
-  position:fixed;top:10px;right:20px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);
-  padding:10px;border-radius:12px;z-index:50;display:flex;gap:.5rem;align-items:center}
-.btn{padding:.6rem 1rem;border:none;border-radius:10px;font-weight:800;cursor:pointer;color:#fff;
-     box-shadow:0 6px 14px rgba(0,0,0,.25);transition:transform .12s ease,filter .12s ease}
-.btn:hover{transform:translateY(-2px);filter:brightness(1.05)}
-.btn-primary{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
-.btn-secondary{background:linear-gradient(135deg,#111,#333)}
-
-/* Sub-nav */
-.nav-center{margin:1rem auto 0;display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}
-.nav-box{display:block;min-width:150px;padding:.9rem 1.6rem;font-weight:800;color:#fff;text-decoration:none;border-radius:14px;
-  box-shadow:0 10px 24px rgba(0,0,0,.3);cursor:pointer;transition:transform .15s,box-shadow .15s;
-  border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px)}
-.nav-box:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(0,0,0,.35)}
-.about{background:linear-gradient(135deg,var(--ars-red),var(--ars-gold))}
-.leaderboards{background:linear-gradient(135deg,var(--ars-navy),var(--ars-white))}
-.partners{background:linear-gradient(135deg,#6bcbff,#063672)}
-
-/* Surfaces */
-.surface{max-width:1100px;margin:1rem auto;padding:1.2rem;border-radius:16px;text-align:left;
-  border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 28px rgba(0,0,0,.28);background:var(--glass)}
-.surface-leader{background:linear-gradient(135deg,rgba(6,54,114,.55),rgba(255,255,255,.25))}
-.surface-partners{background:linear-gradient(135deg,rgba(107,203,255,.4),rgba(6,54,114,.5))}
-
-/* Two-column layout (Bits left, Subs right) */
-.lb-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:1.25rem;
-  align-items:start;
-}
-@media(max-width:760px){ .lb-grid{ grid-template-columns:1fr; } }
-
-.card{border-radius:12px;padding:1rem;background:transparent;border:1px solid rgba(255,255,255,.25);box-shadow:0 8px 18px rgba(0,0,0,.25)}
-.scroll-area{
-  min-height:220px;
-  background:rgba(255,255,255,.08);
-  border-radius:8px;
-  padding:.5rem;
-  overflow:auto;
-}
-.lb-header{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between}
-
-/* List styling */
-.lb-list{list-style:none;margin:0;padding:0}
-.lb-list li{
-  display:flex; gap:.6rem; align-items:center;
-  padding:.45rem .6rem;
-  border-bottom:1px solid rgba(255,255,255,.15);
-}
-.lb-list li:last-child{border-bottom:none}
-.rank{opacity:.65; width:2.2rem; text-align:right}
-.name{font-weight:700; flex:1; text-align:left}
-.value{opacity:.9}
-.muted{opacity:.7}
-
-/* Partners */
-.partner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1rem}
-.partner-card{background:rgba(0,0,0,.4);border-radius:12px;padding:1rem;text-align:center;border:1px solid rgba(255,255,255,.2)}
-.partner-logo{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;margin-bottom:.5rem}
-.partner-card a{color:#1DB954;text-decoration:none;font-weight:600;display:inline-block;margin-top:.4rem}
-
-/* Forms */
-.row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.45rem 0}
-.row input,.row select,.row button{padding:.5rem;border:none;border-radius:8px}
-.row input,.row select{flex:1;min-width:120px}
-form{max-width:520px;margin:1rem auto;background:var(--bgA);padding:1rem;border-radius:12px}
-form input{display:block;width:100%;margin:.5rem 0;padding:.6rem;border:none;border-radius:8px}
-form button{padding:.6rem 1rem;border:none;border-radius:8px;background:var(--ars-red);color:#fff;font-weight:800;cursor:pointer}
-form button:hover{background:var(--ars-gold)}
-
-/* ====== ORIGINAL THEME / LAYOUT CSS (KEPT AFTER TO TAKE PRIORITY) ====== */
   :root{ --ars-red:#EF0107; --ars-white:#FFF; --ars-navy:#063672; --ars-gold:#9C824A; }
   *{box-sizing:border-box}
 
@@ -167,6 +62,7 @@ form button:hover{background:var(--ars-gold)}
     animation:none; color:#1a1a1a;
   }
 
+  /* Heading */
   h1{
     margin:1rem 0 0; font-size:2.8rem; font-weight:900;
     background:linear-gradient(270deg,#EF0107,#FFFFFF,#063672,#EF0107);
@@ -258,9 +154,24 @@ form button:hover{background:var(--ars-gold)}
   .spotify{border-color:#1DB954} .discord{border-color:#5865F2}
   .track{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  /* Spotify visualizer */
+  /* Spotify visualizer (CSS-only animation now) */
   .viz{display:flex;gap:3px;align-items:flex-end;height:28px;margin-top:6px}
   .bar{width:5px;height:8px;background:#1DB954;border-radius:2px;opacity:.95;transform-origin:bottom}
+
+  @keyframes fakeViz {
+    from { transform:scaleY(.4); }
+    to   { transform:scaleY(1.6); }
+  }
+  #viz .bar{
+    animation:fakeViz .8s ease-in-out infinite alternate;
+  }
+  #viz .bar:nth-child(odd){
+    animation-duration:1.1s;
+  }
+  #viz .bar:nth-child(3n){
+    animation-duration:.65s;
+  }
+
   .album{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);padding:.5rem;border-radius:10px;display:flex;gap:.6rem;align-items:center}
   .album img{width:48px;height:48px;border-radius:8px;border:2px solid rgba(255,255,255,.5)}
   .glowPulse{animation:glow 1.4s ease-in-out infinite}
@@ -382,19 +293,15 @@ form button:hover{background:var(--ars-gold)}
 
   <!-- Social column -->
   <div class="social-stack" aria-label="Social links">
-    <!-- Twitch -->
     <a class="social" href="https://www.twitch.tv/ThatLegendJackk" target="_blank" aria-label="Twitch">
       <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#9146FF"/><path d="M60 50h120v82l-38 38h-36l-16 16H72v-20H60V50zm24 24v74h20v20h20l20-20h24V74H84zm64 56V86h-16v44h16zm-36 0V86h-16v44h16z" fill="#fff"/></svg>
     </a>
-    <!-- TikTok -->
     <a class="social" href="https://www.tiktok.com/@thatlegendjack" target="_blank" aria-label="TikTok">
       <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#000"/><path d="M170 56c10 13 24 22 40 24v28c-17-2-31-7-42-16v60c0 35-28 64-64 64-19 0-36-8-48-21 11 9 25 15 40 15 35 0 64-29 64-64V56h10z" fill="#FE2C55" opacity=".9"/><path d="M166 56v88c0 35-28 64-64 64-15 0-29-5-40-15-8-9-12-21-12-33 0-29 23-52 52-52h6v28h-6c-13 0-24 11-24 24s11 24 24 24 24-11 24-24V56h40z" fill="#fff"/></svg>
     </a>
-    <!-- Kick -->
     <a class="social" href="https://kick.com/ThatLegendJackk" target="_blank" aria-label="Kick">
       <svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="240" rx="40" fill="#52FF00"/><path d="M60 60h40v50l40-50h40l-50 60 50 60h-40l-40-50v50H60V60z" fill="#0d0d0d"/></svg>
     </a>
-    <!-- OnlyFans -->
     <a class="social" href="https://onlyfans.com/your-handle" target="_blank" aria-label="OnlyFans">
       <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><rect width="256" height="256" rx="50" fill="#00AFF0"/><path d="M128 76c-29 0-52 23-52 52s23 52 52 52 52-23 52-52-23-52-52-52zm0 24a28 28 0 110 56 28 28 0 010-56z" fill="#fff"/><path d="M206 88h-30l-10 32h16l-8 48h24l12-80h-4z" fill="#fff"/></svg>
     </a>
@@ -416,7 +323,7 @@ form button:hover{background:var(--ars-gold)}
               <img src="https://placehold.co/160x90?text=Clip+3" alt="clip" style="border-radius:8px">
             </div>
           </div>
-          <!-- Spotify album / track -->
+          <!-- (album overlay kept, can customise later if you wish) -->
           <div class="album hidden" id="albumCard">
             <img id="albumArt" src="" alt="album art">
             <div>
@@ -454,11 +361,23 @@ form button:hover{background:var(--ars-gold)}
       </div>
     </div>
 
-    <!-- Spotify connect (demo) -->
+    <!-- Spotify connect (REAL Spotify via embed) -->
     <div id="spotify-connect" class="surface" style="margin-top:1rem;text-align:center;background:rgba(0,0,0,.35)">
-      <button onclick="connectSpotify()" class="spotify-btn">Connect Spotify (Demo)</button>
-      <p style="opacity:.9;margin:.5rem 0 0 0">Demo loads a sample preview to drive the visualizer. Replace with real OAuth later.</p>
-      <audio id="spotify-audio" crossorigin="anonymous" class="hidden"></audio>
+      <button onclick="connectSpotify()" class="spotify-btn">Open Spotify Player</button>
+      <p style="opacity:.9;margin:.5rem 0 0 0">
+        This opens a real Spotify player. Press play in the widget to listen.
+      </p>
+
+      <!-- Hidden until connectSpotify() is clicked -->
+      <div id="spotify-embed" style="margin-top:.75rem;display:none;">
+        <!-- Replace YOUR_SPOTIFY_PLAYLIST_ID_HERE with a real playlist / album / track ID -->
+        <iframe style="border-radius:12px"
+          src="https://open.spotify.com/embed/playlist/YOUR_SPOTIFY_PLAYLIST_ID_HERE?utm_source=generator"
+          width="100%" height="152" frameborder="0"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy">
+        </iframe>
+      </div>
     </div>
   </section>
 
@@ -535,7 +454,7 @@ form button:hover{background:var(--ars-gold)}
     <div class="surface surface-partners">
       <h2>Partnered Servers</h2>
 
-      <!-- Always-visible input bar -->
+      <!-- Invite bar (paste Discord URL) -->
       <div class="partner-form-bar" id="partner-form">
         <form onsubmit="addPartnerFromInvite(event)" class="partner-form-inner">
           <input id="partner_invite"
