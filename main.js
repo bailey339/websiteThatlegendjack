@@ -5,6 +5,7 @@ function showSection(id){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
+/* ===== Decor helpers ===== */
 const decor = document.getElementById("decor-layer");
 function clearDecor(){ decor.innerHTML=""; }
 function rnd(min,max){ return Math.random()*(max-min)+min; }
@@ -37,13 +38,16 @@ function initTwitch(){
   const parent = location.hostname || "localhost";
   embed = new Twitch.Embed("twitch-player", {
     width:"100%", height:"100%", channel:"ThatLegendJackk",
-    layout:"video", autoplay:false, muted:true, parent:[parent, "localhost", "example.com", "thatlegendjack.dev"]
+    layout:"video", autoplay:false, muted:true,
+    parent:[parent, "localhost", "example.com", "thatlegendjack.dev"]
   });
+
   embed.addEventListener(Twitch.Embed.VIDEO_READY, ()=>{
     const player = embed.getPlayer();
     player.addEventListener("PLAY", ()=> document.getElementById("livePill").style.display="inline-flex");
     player.addEventListener("PAUSE", ()=> document.getElementById("livePill").style.display="none");
   });
+
   embed.addEventListener(Twitch.Embed.ONLINE, ()=>{
     document.getElementById("twitch-offline").classList.remove("offline-show");
     document.getElementById("livePill").style.display="inline-flex";
@@ -114,7 +118,7 @@ function renderHalloweenDecor(){
   const webs = 14;
   for (let i=0;i<webs;i++){
     createEmoji(
-      "🕸️", rnd(30,54), rnd(0,96), rnd(0,92),
+      "🕸️", rnd(30,54), rnd(0,92), rnd(0,92),
       "spin",
       `opacity:${rnd(.4,.7).toFixed(2)}; animation-duration:${rnd(8,18).toFixed(2)}s;`
     );
@@ -155,7 +159,7 @@ function renderChristmasDecor(){
   createEmoji("🎅", rnd(36,54), rnd(0,98), rnd(4,40), "drift-right bob",
     `animation-duration:${rnd(18,26).toFixed(2)}s; animation-delay:${rnd(0,3).toFixed(2)}s;`);
 
-  // Reindeer herds
+  // Reindeer
   const herds = 18;
   for(let i=0;i<herds;i++){
     const {cls, dur} = randomMotion();
@@ -163,7 +167,7 @@ function renderChristmasDecor(){
       `animation-duration:${dur.toFixed(2)}s; animation-delay:${rnd(0,6).toFixed(2)}s;`);
   }
 
-  // Candy canes (🍭 stand-in)
+  // Candy (using 🍭)
   const canes = 36;
   for(let i=0;i<canes;i++){
     const {cls, dur} = randomMotion();
@@ -219,6 +223,7 @@ function renderEasterDecor(){
   }
 }
 
+/* ===== Seasonal decor switch ===== */
 function applySeasonalDecor(mode){
   if(mode==="theme-halloween") renderHalloweenDecor();
   else if(mode==="theme-christmas") renderChristmasDecor();
@@ -226,37 +231,27 @@ function applySeasonalDecor(mode){
   else clearDecor();
 }
 
-/* ===== Spotify visualizer (demo) ===== */
-const audioEl=document.getElementById("spotify-audio");
-let audioCtx, analyser, dataArray;
+/* ===== Spotify REAL playback (embed) ===== */
 function connectSpotify(){
-  const demo="https://p.scdn.co/mp3-preview/6a1c6b7b9a332e66a3ab75c6f1a0c2d1c9a3a6d3?cid=774b29d4f13844c495f206cafdad9c86";
-  audioEl.src=demo; audioEl.loop=true; audioEl.play();
-  document.getElementById("spotify-track").textContent="Demo Track — Preview";
-  document.getElementById("albumCard").classList.remove("hidden");
-  document.getElementById("albumArt").src="https://placehold.co/96x96?text=Album";
-  document.getElementById("trackTitle").textContent="Demo Track";
-  document.getElementById("trackArtist").textContent="Artist";
-  if(!audioCtx){
-    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    const src=audioCtx.createMediaElementSource(audioEl);
-    analyser=audioCtx.createAnalyser(); analyser.fftSize=64;
-    src.connect(analyser); analyser.connect(audioCtx.destination);
-    dataArray=new Uint8Array(analyser.frequencyBinCount);
-    (function loop(){
-      analyser.getByteFrequencyData(dataArray);
-      document.querySelectorAll("#viz .bar").forEach((b,i)=>{
-        const v=dataArray[i%dataArray.length]/255;
-        b.style.height=(6+v*24)+"px";
-        b.style.transform=`scaleY(${0.6+v*1.8})`;
-      });
-      requestAnimationFrame(loop);
-    })();
+  const embed = document.getElementById("spotify-embed");
+  if(embed){
+    embed.style.display = "block";
+  }
+  const trackLabel = document.getElementById("spotify-track");
+  if(trackLabel){
+    trackLabel.textContent = "Spotify player ready — press play in the widget";
+  }
+  const btn = document.querySelector("#spotify-connect .spotify-btn");
+  if(btn){
+    btn.textContent = "Spotify Connected";
+    btn.disabled = true;
+    btn.style.opacity = "0.7";
+    btn.style.cursor = "default";
   }
 }
 
 /* ===== Discord Presence (Lanyard) ===== */
-const DISCORD_ID="000000000000000000"; // replace with your user ID
+const DISCORD_ID="000000000000000000"; // replace with your user ID if you want real presence
 try{
   const ws=new WebSocket("wss://api.lanyard.rest/socket");
   ws.onopen=()=>ws.send(JSON.stringify({op:2,d:{subscribe_to_ids:[DISCORD_ID]}}));
@@ -279,15 +274,22 @@ function refreshBits(){
   const list=document.getElementById("bits-list");
   list.innerHTML="<em>Fetching…</em>";
   setTimeout(()=>{
-    const data=[["UserA",1200],["UserB",880],["UserC",640],["UserD",420],["UserE",300],["UserF",250],["UserG",210],["UserH",190],["UserI",170],["UserJ",160]];
+    const data=[
+      ["UserA",1200],["UserB",880],["UserC",640],["UserD",420],["UserE",300],
+      ["UserF",250],["UserG",210],["UserH",190],["UserI",170],["UserJ",160]
+    ];
     list.innerHTML=data.slice(0,n).map((r,i)=>`<div class="flash">#${i+1} <b>${r[0]}</b> — ${r[1]} bits</div>`).join("");
   },400);
 }
+
 let subs=JSON.parse(localStorage.getItem("subsList")||"[]");
 function renderSubs(){
   const list=document.getElementById("subs-list");
   if(!subs.length){list.textContent="No subs yet.";return;}
-  list.innerHTML=subs.sort((a,b)=>b.count-a.count).map((s,i)=>`<div class="flash">#${i+1} <b>${s.name}</b> — ${s.count} gifted</div>`).join("");
+  list.innerHTML=subs
+    .sort((a,b)=>b.count-a.count)
+    .map((s,i)=>`<div class="flash">#${i+1} <b>${s.name}</b> — ${s.count} gifted</div>`)
+    .join("");
 }
 function addOrUpdateSub(){
   const u=document.getElementById("sub_user").value.trim();
@@ -298,140 +300,108 @@ function addOrUpdateSub(){
   localStorage.setItem("subsList",JSON.stringify(subs)); renderSubs();
   confetti({particleCount:60,spread:70,origin:{y:.75}});
 }
-function resetSubs(){ if(!confirm("Reset all subs?"))return; subs=[]; localStorage.removeItem("subsList"); renderSubs(); }
+function resetSubs(){
+  if(!confirm("Reset all subs?"))return;
+  subs=[]; localStorage.removeItem("subsList"); renderSubs();
+}
 function saveTwitchCreds(){
   localStorage.setItem("twitchClientID",document.getElementById("twitch_client_id").value);
   localStorage.setItem("twitchToken",document.getElementById("twitch_access_token").value);
   alert("Saved!");
 }
 
-/* ===== Partnered Servers (auto-fetch from Discord invite) ===== */
-function isStaff() {
-  try {
-    return localStorage.getItem('staffSession') === 'true' &&
-           (localStorage.getItem('staffRole') === 'staff' || localStorage.getItem('staffRole') === 'admin');
-  } catch { return false; }
-}
+/* ===== Partnered servers (local + staff only form) ===== */
 
-function initPartnersUI() {
-  // Form is always visible now; we only disable inputs for non-staff
-  const input  = document.getElementById('partner_invite');
-  const submit = document.querySelector('.partner-submit');
-  const note   = document.getElementById('partner_note');
+let partners=JSON.parse(localStorage.getItem("partners")||"[]");
 
-  const staff = isStaff();
-  input.disabled  = !staff;
-  submit.disabled = !staff;
-  note.textContent = staff
-    ? 'Paste an invite and click Fetch & Add.'
-    : 'Only staff can submit. Ask a mod to add your server.';
-
-  renderPartners();
-}
-
-function parseInviteCode(str) {
-  if (!str) return null;
-  const m = String(str).trim().match(/(?:discord\.gg\/|discord\.com\/invite\/)?([A-Za-z0-9-]+)/i);
-  return m ? m[1] : null;
-}
-function discordIconURL(guild) {
-  if (!guild || !guild.icon) return 'https://placehold.co/128x128?text=Discord';
-  const ext = guild.icon.startsWith('a_') ? 'gif' : 'png';
-  return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${ext}?size=256`;
-}
-function positiveBlurb(guild) {
-  if (guild?.description) return guild.description;
-  const members = guild?.approximate_member_count || guild?.member_count;
-  const online  = guild?.approximate_presence_count || guild?.presence_count;
-  const base = guild?.name || 'this community';
-  if (members && online) {
-    return `${base} is a welcoming server with ${members.toLocaleString()} members (${online.toLocaleString()} active) — come hang out!`;
-  }
-  return `${base} is a friendly, positive community full of good vibes.`;
-}
-function getPartners(){ try{ return JSON.parse(localStorage.getItem('partners')||'[]'); }catch{ return []; } }
-function savePartners(list){ localStorage.setItem('partners', JSON.stringify(list)); }
-
-async function addPartnerFromInvite(e){
-  e.preventDefault();
-  if (!isStaff()) return; // safety
-
-  const input = document.getElementById('partner_invite');
-  const errEl = document.getElementById('partner_err');
-  errEl.textContent = '';
-
-  const code = parseInviteCode(input.value);
-  if (!code){ errEl.textContent='Please paste a valid Discord invite.'; return; }
-
-  try{
-    const url = `https://discord.com/api/v9/invites/${code}?with_counts=true&with_expiration=true`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('Invite not found');
-    const data = await res.json();
-    const guild = data.guild || {};
-    const card = {
-      id: guild.id || code,
-      name: guild.name || 'Discord Server',
-      icon: discordIconURL(guild),
-      url: `https://discord.gg/${code}`,
-      desc: positiveBlurb(guild),
-    };
-
-    const list = getPartners();
-    const i = list.findIndex(x => x.id === card.id);
-    if (i >= 0) list[i] = card; else list.push(card);
-    savePartners(list);
-    input.value = '';
-    renderPartners(true);
-  }catch(err){
-    console.error(err);
-    errEl.textContent = 'Could not fetch that invite. Check the link and try again.';
-  }
-}
-
-function renderPartners(flashLast=false){
-  const grid = document.getElementById('partner-grid');
-  const list = getPartners();
-  grid.innerHTML = list.length ? '' : '<p>No partners yet.</p>';
-  list.forEach((p, i) => {
-    const card = document.createElement('div');
-    card.className = 'partner-card';
-    card.innerHTML = `
-      <img src="${p.icon}" alt="${p.name} icon" onerror="this.src='https://placehold.co/128x128?text=Discord'">
+function renderPartners(){
+  const grid=document.getElementById("partner-grid");
+  if(!grid) return;
+  if(!partners.length){grid.innerHTML="<p>No partners yet.</p>";return;}
+  grid.innerHTML=partners.map(p=>`
+    <div class="partner-card">
+      <img src="${p.logo}" alt="${p.name}">
       <div>
-        <h3>${escapeHTML(p.name)}</h3>
-        <p>${escapeHTML(p.desc)}</p>
-        <a href="${p.url}" target="_blank">Join Server</a>
-        ${isStaff() ? `<div class="partner-actions"><button onclick="removePartner('${p.id}')">Remove</button></div>` : ''}
-      </div>`;
-    grid.appendChild(card);
-    if (flashLast && i===list.length-1){ card.classList.add('flash'); setTimeout(()=>card.classList.remove('flash'),800); }
-  });
+        <h3>${p.name}</h3>
+        <p>${p.desc}</p>
+        <a href="${p.url}" target="_blank">Join</a>
+      </div>
+    </div>`).join("");
 }
-function removePartner(id){
-  if (!isStaff()) return;
-  savePartners(getPartners().filter(x=>x.id!==id));
-  renderPartners();
-}
-function escapeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-/* ===== Simple auth state ===== */
+/**
+ * Very simple helper: takes an invite URL and creates a
+ * positive-sounding description + logo using a generic pattern.
+ * In a real setup you'd call your backend to hit Discord's API.
+ */
+function buildPartnerFromInvite(inviteUrl){
+  // crude server "slug" guess
+  const slug = inviteUrl.replace(/https?:\/\/(www\.)?discord\.gg\//i,"").split(/[\/?#]/)[0] || "community";
+  const name = slug
+    .replace(/[-_]/g," ")
+    .replace(/\s+/g," ")
+    .trim()
+    .replace(/^./,c=>c.toUpperCase());
+
+  return {
+    name: name || "Partnered Community",
+    logo: "https://placehold.co/160x160?text=Server",
+    url: inviteUrl,
+    desc: `A welcoming, positive community focused on good vibes, support, and great conversations. Come hang out with the ${name || "server"} family!`
+  };
+}
+
+function addPartnerFromInvite(e){
+  e.preventDefault();
+  const input = document.getElementById("partner_invite");
+  const err   = document.getElementById("partner_err");
+  err.textContent="";
+
+  const url = input.value.trim();
+  if(!url){
+    err.textContent="Please paste a Discord invite link.";
+    return;
+  }
+  if(!/https?:\/\/(www\.)?discord\.gg\//i.test(url)){
+    err.textContent="That doesn’t look like a Discord invite URL.";
+    return;
+  }
+
+  // Staff-only check (very simple – depends on localStorage flag)
+  if(localStorage.getItem("staffSession")!=="true"){
+    err.textContent="Only staff accounts can add partnered servers.";
+    return;
+  }
+
+  const partner = buildPartnerFromInvite(url);
+  partners.push(partner);
+  localStorage.setItem("partners",JSON.stringify(partners));
+  renderPartners();
+  input.value="";
+}
+
+/* ===== Auth state (simple) ===== */
 function doLogout(){
   localStorage.clear();
   document.getElementById("logoutBtn").classList.add("hidden");
   document.getElementById("loginBtn").classList.remove("hidden");
-  document.getElementById("subs-controls").classList.add("hidden");
-  initPartnersUI(); // re-disable partner form if needed
+  const subsControls=document.getElementById("subs-controls");
+  const pf=document.getElementById("partner-form");
+  if(subsControls) subsControls.classList.add("hidden");
+  if(pf) pf.classList.add("hidden");
 }
 
 /* ===== Init ===== */
 window.addEventListener("load", ()=>{
-  // demo staff flag handling
   if(localStorage.getItem("staffSession")==="true"){
     document.getElementById("logoutBtn").classList.remove("hidden");
     document.getElementById("loginBtn").classList.add("hidden");
-    document.getElementById("subs-controls").classList.remove("hidden");
+    const subsControls=document.getElementById("subs-controls");
+    const pf=document.getElementById("partner-form");
+    if(subsControls) subsControls.classList.remove("hidden");
+    if(pf) pf.classList.remove("hidden");
   }
-  initPartnersUI();
-  renderSubs(); refreshBits();
+  renderSubs();
+  renderPartners();
+  refreshBits();
 });
